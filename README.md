@@ -2,7 +2,7 @@
 
 A free, private audiobook player for Android. It plays your own DRM-free files, keeps long series in order, and can find chapters and their titles by listening to the audio on your phone.
 
-Website: https://m0n0t0ne0ne.github.io/colophon/
+Website: https://m0n0t0ne0ne.github.io/Colophon/
 Download: [latest release](https://github.com/m0n0t0ne0ne/colophon/releases/latest)
 
 ## What it does
