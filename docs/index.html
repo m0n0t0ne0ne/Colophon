@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Colophon: a private audiobook player for Android</title>
+<meta name="description" content="Colophon is a free Android audiobook player that keeps series in order, saves your place in every book, and finds chapters on your phone.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500&family=Hanken+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0B0C0E;--surface:#15171A;--line:#26292D;--text:#ECEBE6;--muted:#A9ADB1;--accent:#9CC2DE}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font:400 17px/1.55 'Hanken Grotesk',system-ui,sans-serif}
+a{color:inherit}
+.wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+nav{display:flex;align-items:center;justify-content:space-between;height:72px}
+.brand{display:flex;align-items:center;gap:10px;font:400 24px 'Newsreader',serif;text-decoration:none}
+.brand img{width:32px;height:32px}
+nav .links{display:flex;gap:24px;font-size:15px}
+nav .links a{text-decoration:none;color:var(--muted);padding:12px 0}
+nav .links a:hover{color:var(--text)}
+h1,h2,h3{font-family:'Newsreader',serif;font-weight:400;margin:0}
+h1{font-size:clamp(44px,7vw,76px);line-height:1.02;letter-spacing:-.02em}
+h2{font-size:clamp(32px,4.5vw,46px);line-height:1.1;letter-spacing:-.01em}
+h3{font-size:24px;line-height:1.2}
+.hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,420px);gap:56px;align-items:center;padding:56px 0 88px}
+.lede{font-size:20px;color:var(--muted);margin:24px 0 32px;max-width:32em}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:52px;padding:0 24px;border-radius:6px;background:var(--text);color:var(--bg);font-weight:600;text-decoration:none}
+.btn:hover{background:#fff}
+.note{display:block;margin-top:14px;font-size:14px;color:var(--muted)}
+.shot{width:100%;display:block;border-radius:22px;border:1px solid var(--line)}
+section{padding:80px 0;border-top:1px solid var(--line)}
+.split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,340px);gap:56px;align-items:center}
+.split.flip{grid-template-columns:minmax(0,340px) minmax(0,1fr)}
+.split p{color:var(--muted);margin:18px 0 0;max-width:34em}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:32px;margin-top:40px}
+.grid p{color:var(--muted);margin:8px 0 0;font-size:16px}
+.steps{margin:32px 0 0;padding:0;list-style:none;counter-reset:s;max-width:44em}
+.steps li{counter-increment:s;display:grid;grid-template-columns:40px 1fr;padding:16px 0;border-bottom:1px solid var(--line)}
+.steps li::before{content:counter(s);font:400 22px 'Newsreader',serif;color:var(--accent)}
+code{font-size:.92em}
+details{border-bottom:1px solid var(--line);max-width:48em}
+summary{cursor:pointer;padding:18px 0;font-weight:500}
+details p{margin:0 0 18px;color:var(--muted)}
+footer{border-top:1px solid var(--line);padding:32px 0 48px;color:var(--muted);font-size:14px}
+footer .wrap{display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:space-between}
+@media(max-width:820px){
+ .hero,.split,.split.flip{grid-template-columns:minmax(0,1fr);gap:40px}
+ .hero{padding-top:24px}
+ .hero .shot,.split .shot{max-width:320px;margin:0 auto}
+ .split.flip .shot-box{order:2}
+ .grid{grid-template-columns:minmax(0,1fr)}
+ section{padding:56px 0}
+ nav .links a:not(.keep){display:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav>
+  <a class="brand" href="#"><img src="favicon.svg" alt="">Colophon</a>
+  <div class="links"><a href="#features">Features</a><a href="#install">Install</a><a href="#questions">Questions</a><a class="keep" href="https://github.com/m0n0t0ne0ne/colophon">GitHub</a></div>
+</nav>
+<header class="hero">
+  <div>
+    <h1>Your audiobooks, in order and on your phone.</h1>
+    <p class="lede">A free, private player for your own DRM-free audiobooks. It keeps long series together, remembers your place in every book, and can find missing chapters by listening.</p>
+    <a class="btn" href="https://github.com/m0n0t0ne0ne/colophon/releases/latest/download/colophon.apk">Download for Android</a>
+    <span class="note">Early release. About 63 MB, for 64-bit Android 8.0 or later.</span>
+  </div>
+  <img class="shot" src="img/player-art.png" alt="The Colophon player with a blurred background drawn from the book's cover">
+</header>
+</div>
+
+<section id="features"><div class="wrap split">
+  <div>
+    <h2>Chapters found by listening.</h2>
+    <p>The analyzer looks for longer pauses, transcribes the moments after them, and suggests titles like Prologue, Chapter 12, or Epilogue. It flags anything uncertain, so you check a handful of sections instead of the whole book.</p>
+    <p>Playback order comes from the audio timeline, so a wrong label can never reshuffle your book.</p>
+  </div>
+  <img class="shot" src="img/review.png" alt="The review screen listing three sections flagged for checking">
+</div></section>
+
+<section><div class="wrap split flip">
+  <div class="shot-box"><img class="shot" src="img/series.png" alt="A five-book series listed in publication order"></div>
+  <div>
+    <h2>A long series stays one series.</h2>
+    <p>Books are grouped together and can be sorted by publication order or series order, with a place for prequels. Every book keeps its own position, so you can listen to several at once.</p>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <h2>The rest of the details.</h2>
+  <div class="grid">
+    <div><h3>Edit anything</h3><p>Rename chapters, move their start times, or merge and delete them. Your audio file is never changed, and the originals are one tap away.</p></div>
+    <div><h3>Your cover, your background</h3><p>Choose your own art for a book or a whole series. The player can use it as a blurred background, take a color from it, or stay black.</p></div>
+    <div><h3>Nothing leaves your phone</h3><p>The app doesn't request internet access. Your files, transcripts, and edits stay on your device.</p></div>
+    <div><h3>Your place is safe</h3><p>Your position saves every few seconds. If you skip by accident, Jump back returns you to where you were.</p></div>
+    <div><h3>Common formats</h3><p>M4B, M4A, MP4, AAC, MP3, FLAC, Ogg, Opus, and WAV, as one file or a folder of files.</p></div>
+    <div><h3>Made for listening</h3><p>Speed control, sleep timer, bookmarks, and a one-color icon for home screens that use themed icons.</p></div>
+  </div>
+</div></section>
+
+<section id="install"><div class="wrap">
+  <h2>Install it.</h2>
+  <ol class="steps">
+    <li><span>Download <a href="https://github.com/m0n0t0ne0ne/colophon/releases/latest/download/colophon.apk">colophon.apk</a> on your phone.</span></li>
+    <li><span>Open the file. If Android asks, allow your browser or file app to install unknown apps.</span></li>
+    <li><span>Open Colophon, tap the plus button in Library, and add a folder or files.</span></li>
+  </ol>
+</div></section>
+
+<section id="questions"><div class="wrap">
+  <h2>Questions.</h2>
+  <div style="margin-top:24px">
+    <details><summary>Does it cost anything?</summary><p>No. It's free and open source, with no account or subscription.</p></details>
+    <details><summary>Will it play books from Audible or other stores?</summary><p>It plays DRM-free files only. Protected files such as AA and AAX are skipped, and Colophon doesn't try to get around that protection.</p></details>
+    <details><summary>How accurate is the analyzer?</summary><p>It works best with clear narration and spoken headings. It only understands English for now, and it can mishear unusual names, which is why there is a review step. Long books can take a while, so it can wait until your phone is charging.</p></details>
+    <details><summary>What happens if I uninstall it?</summary><p>Your audio files stay where they are. Positions, bookmarks, and chapter edits are stored inside the app and may be lost unless Android's device backup restores them.</p></details>
+  </div>
+</div></section>
+
+<footer><div class="wrap">
+  <span>Colophon is open source under the Apache License 2.0.</span>
+  <span><a href="https://github.com/m0n0t0ne0ne/colophon">Source</a> · <a href="https://github.com/m0n0t0ne0ne/colophon/issues">Report a problem</a></span>
+</div></footer>
+</body>
+</html>
