@@ -169,6 +169,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun hideFromContinue(book: Book) {
+        viewModelScope.launch {
+            if (hub.state.value.bookId == book.id) hub.pause()
+            dao.setHidden(book.id, true)
+            message.value = "Removed from Continue listening. Your place is saved."
+        }
+    }
+
+    fun setAnalyzed(bookId: Long, analyzed: Boolean) {
+        viewModelScope.launch { dao.setAnalyzedAt(bookId, if (analyzed) System.currentTimeMillis() else 0) }
+    }
+
     fun resetChapters(bookId: Long) {
         viewModelScope.launch { dao.replaceSet(bookId, ChapterSet.CURRENT, dao.chapters(bookId, ChapterSet.ORIGINAL)) }
     }

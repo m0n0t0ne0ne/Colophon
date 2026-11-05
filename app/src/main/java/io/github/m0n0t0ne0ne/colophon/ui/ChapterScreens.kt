@@ -2,6 +2,7 @@ package io.github.m0n0t0ne0ne.colophon.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -126,6 +127,7 @@ fun ChaptersContent(
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun AnalyzerContent(
     books: List<Book>,
@@ -139,6 +141,7 @@ fun AnalyzerContent(
     onClearFailed: () -> Unit,
     fullScan: Boolean = false,
     onFullScan: (Boolean) -> Unit = {},
+    onSetAnalyzed: (Long, Boolean) -> Unit = { _, _ -> },
 ) {
     Column(Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 20.dp)) {
         Spacer(Modifier.height(8.dp))
@@ -161,20 +164,24 @@ fun AnalyzerContent(
             Switch(fullScan, onFullScan, colors = SwitchDefaults.colors(checkedThumbColor = C.Ground, checkedTrackColor = C.Text))
         }
         HorizontalDivider(color = C.Line)
+        val busy: (Book) -> Boolean = { b -> runs.any { it.bookId == b.id && it.state != WorkInfo.State.FAILED } || b.id in reviews }
+        val toDo = books.filter { busy(it) || it.analyzedAt == 0L }
+        val analyzed = books.filter { !busy(it) && it.analyzedAt > 0L }
+        var section by rememberSaveable { mutableIntStateOf(0) }
+        val shown = if (section == 0) toDo else analyzed
+        UnderlineTabs(listOf("To analyze (${toDo.size})", "Analyzed (${analyzed.size})"), section) { section = it }
         LazyColumn(Modifier.fillMaxSize()) {
-            val busy: (Book) -> Boolean = { b -> runs.any { it.bookId == b.id && it.state != WorkInfo.State.FAILED } || b.id in reviews }
-            val active = books.filter(busy)
-            val waiting = books.filter { !busy(it) && it.analyzedAt == 0L }
-            val analyzed = books.filter { !busy(it) && it.analyzedAt > 0L }
-            val sections = listOf("In progress" to active, "Not analyzed" to waiting, "Analyzed" to analyzed).filter { it.second.isNotEmpty() }
-            sections.forEach { (heading, list) ->
-            item(key = "header-$heading") {
-                Text("$heading (${list.size})", style = Small.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium), modifier = Modifier.padding(top = 18.dp, bottom = 6.dp))
-                HorizontalDivider(color = C.Line)
-            }
-            items(list, key = { it.id }) { book ->
+            items(shown, key = { it.id }) { book ->
                 val run = runs.firstOrNull { it.bookId == book.id }
-                Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                var menu by remember { mutableStateOf(false) }
+                Row(
+                    Modifier.fillMaxWidth().combinedClickable(onClick = {}, onLongClick = { menu = true }, onLongClickLabel = "Book options").padding(vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    DropdownMenu(menu, { menu = false }) {
+                        if (book.analyzedAt > 0L) DropdownMenuItem(text = { Text("Move to To analyze") }, onClick = { menu = false; onSetAnalyzed(book.id, false) })
+                        else DropdownMenuItem(text = { Text("Mark as analyzed") }, onClick = { menu = false; onSetAnalyzed(book.id, true) })
+                    }
                     Cover(book, 52.dp)
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         Text(book.title, style = Body, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -200,6 +207,8 @@ fun AnalyzerContent(
                 }
                 HorizontalDivider(color = C.Line)
             }
+            if (books.isNotEmpty() && shown.isEmpty()) item {
+                Text(if (section == 0) "Nothing left to analyze." else "Books appear here after you save their analyzed chapters.", style = Small, modifier = Modifier.padding(vertical = 20.dp))
             }
             if (books.isEmpty()) item { Text("Add a book to your library first.", style = Small, modifier = Modifier.padding(vertical = 20.dp)) }
         }

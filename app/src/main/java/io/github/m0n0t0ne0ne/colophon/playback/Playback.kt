@@ -100,7 +100,10 @@ class PlaybackService : MediaSessionService() {
         if (files.isEmpty()) return
         val global = Timeline.global(files, index, position)
         val finished = files.sum() - global < FINISHED_MARGIN_MS
-        ColophonDatabase.get(this).dao().savePosition(bookId, global, System.currentTimeMillis(), finished)
+        val dao = ColophonDatabase.get(this).dao()
+        dao.savePosition(bookId, global, System.currentTimeMillis(), finished)
+        // Playing a book again brings it back to Continue listening.
+        if (player.isPlaying) dao.setHidden(bookId, false)
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session

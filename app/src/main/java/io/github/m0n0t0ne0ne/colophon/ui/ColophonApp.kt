@@ -88,7 +88,7 @@ fun ColophonApp(vm: AppViewModel) {
                     val full by vm.fullScan.collectAsStateWithLifecycle()
                     AnalyzerContent(
                         books, runs, reviews, charging, vm::setOnlyCharging, vm::analyze, vm::cancelAnalysis,
-                        { nav.navigate("review/$it") }, vm::clearFailedRuns, full, vm::setFullScan,
+                        { nav.navigate("review/$it") }, vm::clearFailedRuns, full, vm::setFullScan, vm::setAnalyzed,
                     )
                 }
                 composable("review/{id}", listOf(idArg())) { e -> ReviewRoute(vm, nav, e.id()) }
@@ -120,6 +120,8 @@ private fun LibraryRoute(vm: AppViewModel, nav: NavHostController, tab: Int) {
         { folder.launch(null) },
         { files.launch(arrayOf("audio/*", "video/mp4", "application/octet-stream")) },
         vm::refreshLibrary,
+        vm::hideFromContinue,
+        { b -> nav.navigate("details/${b.id}") },
     )
 }
 

@@ -110,6 +110,13 @@ class LibraryTest {
         assertTrue(p.first { it.files.first().name == "Piranesi.m4b" }.images.isEmpty())
     }
 
+    @Test fun hiddenBooksLeaveContinueListeningButKeepTheirPlace() {
+        val a = io.github.m0n0t0ne0ne.colophon.data.Book(id = 1, sourceKey = "a", title = "A", positionMs = 500, lastPlayedAt = 2)
+        val b = a.copy(id = 2, sourceKey = "b", title = "B", hiddenFromContinue = true)
+        assertEquals(listOf(a), io.github.m0n0t0ne0ne.colophon.ui.inProgress(listOf(a, b)))
+        assertEquals(500L, b.positionMs)
+    }
+
     @Test fun updatingKeepsExistingBooksAndPositions() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val path = context.getDatabasePath("migrate.db").also { it.parentFile?.mkdirs(); it.delete() }
@@ -127,11 +134,12 @@ class LibraryTest {
             db.version = 1
         }
         val room = Room.databaseBuilder(context, ColophonDatabase::class.java, "migrate.db")
-            .addMigrations(ColophonDatabase.MIGRATION_1_2, ColophonDatabase.MIGRATION_2_3).allowMainThreadQueries().build()
+            .addMigrations(ColophonDatabase.MIGRATION_1_2, ColophonDatabase.MIGRATION_2_3, ColophonDatabase.MIGRATION_3_4).allowMainThreadQueries().build()
         val book = room.dao().allBooks().single()
         assertEquals(500L, book.positionMs)
         assertFalse(book.userEdited)
         assertEquals(0L, book.analyzedAt)
+        assertFalse(book.hiddenFromContinue)
         room.close()
     }
 }

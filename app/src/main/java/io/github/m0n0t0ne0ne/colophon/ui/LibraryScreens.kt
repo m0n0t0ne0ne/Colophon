@@ -2,6 +2,7 @@ package io.github.m0n0t0ne0ne.colophon.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
@@ -35,7 +36,7 @@ fun groupSeries(books: List<Book>): List<SeriesGroup> =
         .map { (name, list) -> SeriesGroup(name, list) }.sortedBy { it.name.lowercase() }
 
 fun inProgress(books: List<Book>): List<Book> =
-    books.filter { it.positionMs > 0 && !it.finished }.sortedByDescending { it.lastPlayedAt }
+    books.filter { it.positionMs > 0 && !it.finished && !it.hiddenFromContinue }.sortedByDescending { it.lastPlayedAt }
 
 @Composable
 fun LibraryContent(
@@ -47,6 +48,8 @@ fun LibraryContent(
     onAddFolder: () -> Unit,
     onAddFiles: () -> Unit,
     onRefresh: () -> Unit = {},
+    onHideFromContinue: (Book) -> Unit = {},
+    onEditBook: (Book) -> Unit = {},
 ) {
     var tab by rememberSaveable(initialTab) { mutableIntStateOf(initialTab) }
     var query by rememberSaveable { mutableStateOf("") }
@@ -88,7 +91,7 @@ fun LibraryContent(
         LazyVerticalGrid(GridCells.Fixed(3), Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(vertical = 16.dp)) {
             if (tab == 0 && listening.isNotEmpty()) {
                 header("Continue listening")
-                items(listening.take(5), span = { GridItemSpan(3) }) { ContinueRow(it) { onOpenBook(it) } }
+                items(listening.take(5), span = { GridItemSpan(3) }) { ContinueRow(it, { onOpenBook(it) }, { onHideFromContinue(it) }, { onEditBook(it) }) }
             }
             if (tab != 2 && groups.isNotEmpty()) {
                 header("Series")
@@ -123,9 +126,18 @@ private fun EmptyLibrary(onAddFolder: () -> Unit, onAddFiles: () -> Unit) {
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun ContinueRow(book: Book, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+private fun ContinueRow(book: Book, onClick: () -> Unit, onHide: () -> Unit, onEdit: () -> Unit) {
+    var menu by remember { mutableStateOf(false) }
+    Row(
+        Modifier.fillMaxWidth().combinedClickable(onClick = onClick, onLongClick = { menu = true }, onLongClickLabel = "Book options").padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically,
+    ) {
+        DropdownMenu(menu, { menu = false }) {
+            DropdownMenuItem(text = { Text("Remove from Continue listening") }, onClick = { menu = false; onHide() })
+            DropdownMenuItem(text = { Text("Book details") }, onClick = { menu = false; onEdit() })
+        }
         Cover(book, 88.dp)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(book.title, style = BookTitle, maxLines = 2, overflow = TextOverflow.Ellipsis)

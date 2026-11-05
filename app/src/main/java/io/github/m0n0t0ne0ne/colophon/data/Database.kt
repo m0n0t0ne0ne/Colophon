@@ -25,6 +25,8 @@ data class Book(
     @ColumnInfo(defaultValue = "0") val userEdited: Boolean = false,
     /** When analyzed chapters were last saved, or 0 if they never were. */
     @ColumnInfo(defaultValue = "0") val analyzedAt: Long = 0,
+    /** Hidden from Continue listening until the book is played again. Its place is kept. */
+    @ColumnInfo(defaultValue = "0") val hiddenFromContinue: Boolean = false,
 )
 
 @Entity(primaryKeys = ["bookId", "idx"])
@@ -81,6 +83,8 @@ interface LibraryDao {
 
     @Query("UPDATE Book SET positionMs = :pos, lastPlayedAt = :at, finished = :finished WHERE id = :id")
     suspend fun savePosition(id: Long, pos: Long, at: Long, finished: Boolean)
+    @Query("UPDATE Book SET hiddenFromContinue = :hidden WHERE id = :id") suspend fun setHidden(id: Long, hidden: Boolean)
+    @Query("UPDATE Book SET analyzedAt = :at WHERE id = :id") suspend fun setAnalyzedAt(id: Long, at: Long)
     @Query("UPDATE Book SET speed = :speed WHERE id = :id") suspend fun saveSpeed(id: Long, speed: Float)
 
     @Insert suspend fun insertFiles(files: List<BookFile>)
@@ -116,7 +120,7 @@ interface LibraryDao {
     suspend fun trimHistory(id: Long)
 }
 
-@Database(entities = [Book::class, BookFile::class, Chapter::class, Bookmark::class, PositionHistory::class], version = 3, exportSchema = false)
+@Database(entities = [Book::class, BookFile::class, Chapter::class, Bookmark::class, PositionHistory::class], version = 4, exportSchema = false)
 abstract class ColophonDatabase : RoomDatabase() {
     abstract fun dao(): LibraryDao
 
@@ -133,10 +137,16 @@ abstract class ColophonDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE Book ADD COLUMN hiddenFromContinue INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         @Volatile private var instance: ColophonDatabase? = null
         fun get(context: Context): ColophonDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(context.applicationContext, ColophonDatabase::class.java, "colophon.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .build().also { instance = it }
         }
     }
