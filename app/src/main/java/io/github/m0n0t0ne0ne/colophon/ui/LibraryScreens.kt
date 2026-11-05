@@ -46,6 +46,7 @@ fun LibraryContent(
     onOpenSeries: (String) -> Unit,
     onAddFolder: () -> Unit,
     onAddFiles: () -> Unit,
+    onRefresh: () -> Unit = {},
 ) {
     var tab by rememberSaveable(initialTab) { mutableIntStateOf(initialTab) }
     var query by rememberSaveable { mutableStateOf("") }
@@ -63,6 +64,7 @@ fun LibraryContent(
         Spacer(Modifier.height(8.dp))
         HeaderRow("Library", null) {
             IconBtn(Ic.Search, "Search library") { searching = !searching; if (!searching) query = "" }
+            IconBtn(Ic.Refresh, "Refresh library", if (importing) C.Muted else C.Text, onRefresh)
             Box {
                 IconBtn(Ic.Add, "Add audiobooks") { menu = true }
                 DropdownMenu(menu, { menu = false }) {

@@ -119,6 +119,7 @@ private fun LibraryRoute(vm: AppViewModel, nav: NavHostController, tab: Int) {
         { s -> nav.navigate("series/${Uri.encode(s)}") },
         { folder.launch(null) },
         { files.launch(arrayOf("audio/*", "video/mp4", "application/octet-stream")) },
+        vm::refreshLibrary,
     )
 }
 

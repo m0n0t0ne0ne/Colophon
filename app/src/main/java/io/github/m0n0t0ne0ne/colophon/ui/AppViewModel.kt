@@ -58,19 +58,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
         }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    fun importFolder(uri: Uri) = runImport { Importer(context, dao).importFolder(uri) }
-    fun importFiles(uris: List<Uri>) = runImport { Importer(context, dao).importFiles(uris) }
+    fun importFolder(uri: Uri) = runImport { Importer(context, dao, removedFiles()).importFolder(uri) }
+    fun importFiles(uris: List<Uri>) = runImport { Importer(context, dao, removedFiles()).importFiles(uris) }
+    fun refreshLibrary() = runImport { Importer(context, dao, removedFiles()).refresh() }
+
+    private fun removedFiles(): Set<String> = prefs.getStringSet("removedFiles", emptySet()).orEmpty()
 
     private fun runImport(block: suspend () -> ImportResult) {
+        if (importing.value) return
         viewModelScope.launch {
             importing.value = true
-            val result = withContext(Dispatchers.IO) { block() }
+            val result = runCatching { withContext(Dispatchers.IO) { block() } }
             importing.value = false
-            message.value = buildString {
-                append(if (result.added == 1) "Added 1 book." else "Added ${result.added} books.")
-                if (result.skippedProtected > 0) append(" Skipped ${result.skippedProtected} DRM-protected file(s).")
-                if (result.failed > 0) append(" ${result.failed} couldn't be read.")
-            }
+            message.value = result.fold({ it.summary() }, { "The library couldn't be updated: ${it.message}" })
         }
     }
 
@@ -154,7 +154,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun saveBook(book: Book, coverForSeries: Boolean) {
         viewModelScope.launch {
-            dao.update(book)
+            dao.update(book.copy(userEdited = true))
             if (coverForSeries && book.series != null) {
                 dao.booksInSeries(book.series).forEach { if (it.id != book.id) dao.update(it.copy(coverPath = book.coverPath)) }
             }
@@ -169,7 +169,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             hub.forget(bookId)
             cancelAnalysis(bookId)
+            // Remembered so a refresh doesn't bring back a book you removed on purpose.
+            val keys = dao.files(bookId).map { Importer.fileKey(it.uri) }
+            prefs.edit().putStringSet("removedFiles", removedFiles() + keys).apply()
             dao.deleteChapters(bookId)
+            dao.deleteBookmarks(bookId)
+            dao.deleteHistory(bookId)
             dao.deleteFiles(bookId)
             dao.deleteBook(bookId)
         }

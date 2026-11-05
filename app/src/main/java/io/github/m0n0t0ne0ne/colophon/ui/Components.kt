@@ -98,6 +98,7 @@ object Ic {
     val Down = line("down", "M6 9l6 6 6-6")
     val Forward = line("forward", "M9 6l6 6-6 6")
     val Search = line("search", "M18 11a7 7 0 1 1-14 0a7 7 0 0 1 14 0zM20 20l-4-4")
+    val Refresh = line("refresh", "M20 12a8 8 0 1 1-2.4-5.7L20 8.5M20 4v4.5h-4.5")
     val Add = line("add", "M12 5v14M5 12h14")
     val More = fill("more", "M12 3.4a1.6 1.6 0 1 1 0 3.2a1.6 1.6 0 0 1 0-3.2zM12 10.4a1.6 1.6 0 1 1 0 3.2a1.6 1.6 0 0 1 0-3.2zM12 17.4a1.6 1.6 0 1 1 0 3.2a1.6 1.6 0 0 1 0-3.2z")
     val Play = fill("play", "M7 4l14 8-14 8z")

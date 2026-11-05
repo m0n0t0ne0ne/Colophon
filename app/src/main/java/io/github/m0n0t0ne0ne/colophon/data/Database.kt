@@ -2,6 +2,8 @@ package io.github.m0n0t0ne0ne.colophon.data
 
 import android.content.Context
 import androidx.room.*
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 
 @Entity(indices = [Index("sourceKey", unique = true)])
@@ -19,6 +21,8 @@ data class Book(
     val lastPlayedAt: Long = 0,
     val finished: Boolean = false,
     val speed: Float = 1f,
+    /** Set once you edit the details, so a library refresh never overwrites your changes. */
+    @ColumnInfo(defaultValue = "0") val userEdited: Boolean = false,
 )
 
 @Entity(primaryKeys = ["bookId", "idx"])
@@ -61,6 +65,10 @@ data class PositionHistory(
 @Dao
 interface LibraryDao {
     @Query("SELECT * FROM Book ORDER BY title COLLATE NOCASE") fun books(): Flow<List<Book>>
+    @Query("SELECT * FROM Book") suspend fun allBooks(): List<Book>
+    @Query("SELECT * FROM BookFile ORDER BY bookId, idx") suspend fun allFiles(): List<BookFile>
+    @Query("DELETE FROM Bookmark WHERE bookId = :id") suspend fun deleteBookmarks(id: Long)
+    @Query("DELETE FROM PositionHistory WHERE bookId = :id") suspend fun deleteHistory(id: Long)
     @Query("SELECT * FROM Book WHERE id = :id") fun bookFlow(id: Long): Flow<Book?>
     @Query("SELECT * FROM Book WHERE id = :id") suspend fun book(id: Long): Book?
     @Query("SELECT * FROM Book WHERE sourceKey = :key") suspend fun bookByKey(key: String): Book?
@@ -106,14 +114,21 @@ interface LibraryDao {
     suspend fun trimHistory(id: Long)
 }
 
-@Database(entities = [Book::class, BookFile::class, Chapter::class, Bookmark::class, PositionHistory::class], version = 1, exportSchema = false)
+@Database(entities = [Book::class, BookFile::class, Chapter::class, Bookmark::class, PositionHistory::class], version = 2, exportSchema = false)
 abstract class ColophonDatabase : RoomDatabase() {
     abstract fun dao(): LibraryDao
 
     companion object {
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE Book ADD COLUMN userEdited INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         @Volatile private var instance: ColophonDatabase? = null
         fun get(context: Context): ColophonDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(context.applicationContext, ColophonDatabase::class.java, "colophon.db")
+                .addMigrations(MIGRATION_1_2)
                 .build().also { instance = it }
         }
     }
