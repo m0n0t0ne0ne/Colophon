@@ -142,7 +142,7 @@ object TitleExtractor {
             out += words[i].text
             i++
         }
-        if (!sawGap && i < words.size) return ""
+        if (!sawGap) return ""
         return titleCase(out)
     }
 
@@ -168,7 +168,8 @@ object ChapterBuilder {
         for (c in sorted) {
             if (c.heading == null && c.pauseMs < UNTITLED_MIN_PAUSE_MS) continue
             val last = kept.lastOrNull()
-            if (last != null && abs(c.startMs - last.startMs) < MERGE_WINDOW_MS) {
+            val bothHeadings = last?.heading != null && c.heading != null && last.heading.label != c.heading.label
+            if (last != null && !bothHeadings && abs(c.startMs - last.startMs) < MERGE_WINDOW_MS) {
                 if (last.heading == null && c.heading != null) kept[kept.lastIndex] = c
                 continue
             }
