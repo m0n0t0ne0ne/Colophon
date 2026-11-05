@@ -36,6 +36,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     val message = MutableStateFlow<String?>(null)
     val importing = MutableStateFlow(false)
+    val previewing = MutableStateFlow(false)
+    private var previewReturn: Long? = null
 
     val backgroundMode = MutableStateFlow(
         runCatching { BackgroundMode.valueOf(prefs.getString("bg", "Art")!!) }.getOrDefault(BackgroundMode.Art),
@@ -76,6 +78,26 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun play(bookId: Long, autoplay: Boolean = true, at: Long? = null) {
         viewModelScope.launch { hub.open(bookId, autoplay, at) }
+    }
+
+    /** Plays a moment for checking, then returns to where you were listening when it stops. */
+    fun startPreview(bookId: Long, at: Long) {
+        viewModelScope.launch {
+            if (!previewing.value) {
+                val s = hub.state.value
+                previewReturn = if (s.bookId == bookId) s.positionMs else dao.book(bookId)?.positionMs
+            }
+            previewing.value = true
+            hub.open(bookId, true, at)
+        }
+    }
+
+    fun stopPreview() {
+        if (!previewing.value) return
+        previewing.value = false
+        hub.pause()
+        previewReturn?.let { hub.seekTo(it) }
+        previewReturn = null
     }
 
     fun setBackground(mode: BackgroundMode) {
@@ -137,6 +159,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Removes this marker, so its audio becomes part of the chapter before it. */
+    fun mergeWithPrevious(chapter: Chapter) {
+        viewModelScope.launch {
+            val list = dao.chapters(chapter.bookId, chapter.chapterSet)
+            val previous = list.getOrNull(list.indexOfFirst { it.id == chapter.id } - 1) ?: return@launch
+            dao.deleteChapter(chapter.id)
+            message.value = "Merged into ${previous.title}."
+        }
+    }
+
     fun resetChapters(bookId: Long) {
         viewModelScope.launch { dao.replaceSet(bookId, ChapterSet.CURRENT, dao.chapters(bookId, ChapterSet.ORIGINAL)) }
     }
@@ -146,6 +178,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val list = dao.chapters(bookId, ChapterSet.SUGGESTED).map { it.copy(reason = null) }
             dao.replaceSet(bookId, ChapterSet.CURRENT, list)
             dao.clearSet(bookId, ChapterSet.SUGGESTED)
+            dao.book(bookId)?.let { dao.update(it.copy(analyzedAt = System.currentTimeMillis())) }
             message.value = "Chapters saved. Your original file is unchanged."
         }
     }

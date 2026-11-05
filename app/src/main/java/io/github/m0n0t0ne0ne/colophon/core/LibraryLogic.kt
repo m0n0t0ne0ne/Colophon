@@ -114,6 +114,8 @@ data class BookPlan(
     val seriesFolder: String?,
     val cue: ScanNode?,
     val playlist: ScanNode?,
+    /** Pictures that belong to this book, best match first. */
+    val images: List<ScanNode> = emptyList(),
 )
 
 object LibraryScanner {
@@ -143,7 +145,7 @@ object LibraryScanner {
             val all = tracks + discs.sortedWith(compareBy(NaturalOrder) { it.name }).flatMap { d ->
                 d.children.filter { ext(it.name) in audio }.sortedWith(compareBy(NaturalOrder) { it.name })
             }
-            return listOf(BookPlan(all, dir.name, seriesFrom(ancestors, dir.name, all), null, playlist))
+            return listOf(BookPlan(all, dir.name, seriesFrom(ancestors, dir.name, all), null, playlist, CoverImages.rank(files, dir.name)))
         }
 
         val separate = tracks.size > 1 && !isParts(tracks.map { it.name }) &&
@@ -152,11 +154,14 @@ object LibraryScanner {
             tracks.isEmpty() -> Unit
             separate -> tracks.forEach { t ->
                 val cue = cues.firstOrNull { it.name.substringBeforeLast('.') == t.name.substringBeforeLast('.') }
-                out += BookPlan(listOf(t), null, seriesFrom(above, t.name, listOf(t)), cue, null)
+                val base = t.name.substringBeforeLast('.')
+                val own = files.filter { CoverImages.isImage(it.name) && it.name.substringBeforeLast('.').equals(base, true) }
+                out += BookPlan(listOf(t), null, seriesFrom(above, t.name, listOf(t)), cue, null, own)
             }
             isRoot && tracks.size == 1 ->
-                out += BookPlan(tracks, null, seriesFrom(above, tracks[0].name, tracks), cues.firstOrNull(), null)
-            else -> out += BookPlan(tracks, dir.name, seriesFrom(ancestors, dir.name, tracks), cues.firstOrNull(), playlist)
+                out += BookPlan(tracks, null, seriesFrom(above, tracks[0].name, tracks), cues.firstOrNull(), null,
+                    files.filter { CoverImages.isImage(it.name) && it.name.substringBeforeLast('.').equals(tracks[0].name.substringBeforeLast('.'), true) })
+            else -> out += BookPlan(tracks, dir.name, seriesFrom(ancestors, dir.name, tracks), cues.firstOrNull(), playlist, CoverImages.rank(files, dir.name))
         }
         folders.forEach { out += walk(it, above, false) }
         return out
@@ -175,6 +180,33 @@ object LibraryScanner {
             if (core.isEmpty() || !text.contains(core)) return null
         }
         return nearest.name.trim()
+    }
+}
+
+object CoverImages {
+    private val types = setOf("jpg", "jpeg", "png", "webp")
+    private val preferred = listOf("cover", "folder", "front", "album", "artwork", "art", "poster")
+    private val avoided = Regex("""\b(back|rear|spine|inside|inlay|booklet|disc|cd)\b""", RegexOption.IGNORE_CASE)
+
+    fun isImage(name: String) = LibraryScanner.ext(name) in types
+
+    /** Orders a folder's pictures so a clearly named cover wins, and a "back" or "disc" image is left out when possible. */
+    fun rank(files: List<ScanNode>, folderName: String): List<ScanNode> {
+        val images = files.filter { isImage(it.name) && !it.name.startsWith(".") }
+        val title = SeriesNames.core(folderName)
+        fun score(n: ScanNode): Int {
+            val base = n.name.substringBeforeLast('.')
+            val core = SeriesNames.core(base)
+            val word = preferred.indexOfFirst { p -> core == p }
+            return when {
+                word >= 0 -> word
+                preferred.any { p -> Regex("""\b$p\b""", RegexOption.IGNORE_CASE).containsMatchIn(base) } -> 10
+                title.isNotEmpty() && (core.contains(title) || title.contains(core)) && !avoided.containsMatchIn(base) -> 20
+                avoided.containsMatchIn(base) -> 90
+                else -> 50
+            }
+        }
+        return images.sortedWith(compareBy<ScanNode> { score(it) }.then(compareBy(NaturalOrder) { it.name }))
     }
 }
 

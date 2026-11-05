@@ -23,6 +23,8 @@ data class Book(
     val speed: Float = 1f,
     /** Set once you edit the details, so a library refresh never overwrites your changes. */
     @ColumnInfo(defaultValue = "0") val userEdited: Boolean = false,
+    /** When analyzed chapters were last saved, or 0 if they never were. */
+    @ColumnInfo(defaultValue = "0") val analyzedAt: Long = 0,
 )
 
 @Entity(primaryKeys = ["bookId", "idx"])
@@ -114,7 +116,7 @@ interface LibraryDao {
     suspend fun trimHistory(id: Long)
 }
 
-@Database(entities = [Book::class, BookFile::class, Chapter::class, Bookmark::class, PositionHistory::class], version = 2, exportSchema = false)
+@Database(entities = [Book::class, BookFile::class, Chapter::class, Bookmark::class, PositionHistory::class], version = 3, exportSchema = false)
 abstract class ColophonDatabase : RoomDatabase() {
     abstract fun dao(): LibraryDao
 
@@ -125,10 +127,16 @@ abstract class ColophonDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE Book ADD COLUMN analyzedAt INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         @Volatile private var instance: ColophonDatabase? = null
         fun get(context: Context): ColophonDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(context.applicationContext, ColophonDatabase::class.java, "colophon.db")
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build().also { instance = it }
         }
     }

@@ -93,6 +93,7 @@ class Importer(private val context: Context, private val dao: LibraryDao, privat
             ids.filter { it != keep }.forEach { deleteBook(it) }
             matched += keep
             refreshExisting(keep, plan, keys, ids.size > 1)
+            if (applyFolderCover(keep, plan)) updated++
         }
 
         val missing = dao.allBooks().filter { it.id !in matched }.mapNotNull { book ->
@@ -111,6 +112,7 @@ class Importer(private val context: Context, private val dao: LibraryDao, privat
             if (moved != null) {
                 missing.remove(moved)
                 saveFiles(moved.first.id, probes)
+                applyFolderCover(moved.first.id, plan)
                 updated++
             } else {
                 addBook(plan, probes)
@@ -160,6 +162,24 @@ class Importer(private val context: Context, private val dao: LibraryDao, privat
             dao.update(next)
             updated++
         } else if (merged) updated++
+    }
+
+    /** A picture in the book's folder becomes its cover, unless you've chosen one yourself. */
+    private suspend fun applyFolderCover(id: Long, plan: BookPlan): Boolean {
+        val book = dao.book(id) ?: return false
+        if (book.coverPath?.substringAfterLast('/')?.startsWith("custom_") == true) return false
+        val image = plan.images.firstOrNull() ?: return false
+        val d = doc(image)
+        val stamp = (d.uri.toString() + d.lastModified() + d.length()).hashCode().toUInt()
+        val target = Covers.dir(context).resolve("folder_${id}_$stamp.img")
+        if (book.coverPath == target.absolutePath && target.exists()) return false
+        val copied = runCatching {
+            context.contentResolver.openInputStream(d.uri)!!.use { input -> target.outputStream().use { input.copyTo(it) } }
+        }.isSuccess
+        if (!copied) return false
+        book.coverPath?.let { old -> runCatching { File(old).delete() } }
+        dao.update(book.copy(coverPath = target.absolutePath))
+        return true
     }
 
     private suspend fun saveFiles(id: Long, probes: List<Probe>) {
@@ -278,6 +298,7 @@ class Importer(private val context: Context, private val dao: LibraryDao, privat
 
         val cover = ordered.firstNotNullOfOrNull { it.picture }?.let { saveCover(id, it) }
         if (cover != null) dao.book(id)?.let { dao.update(it.copy(coverPath = cover)) }
+        applyFolderCover(id, plan)
 
         val chapters = readChapters(ordered, plan.cue)
         dao.replaceSet(id, ChapterSet.ORIGINAL, chapters)

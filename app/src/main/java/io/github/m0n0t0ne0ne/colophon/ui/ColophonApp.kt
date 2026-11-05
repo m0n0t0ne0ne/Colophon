@@ -177,13 +177,16 @@ private fun ChaptersRoute(vm: AppViewModel, nav: NavHostController, id: Long) {
 @Composable
 private fun ReviewRoute(vm: AppViewModel, nav: NavHostController, id: Long) {
     val chapters by remember(id) { vm.chapters(id, ChapterSet.SUGGESTED) }.collectAsStateWithLifecycle(emptyList())
+    val previewing by vm.previewing.collectAsStateWithLifecycle()
+    DisposableEffect(id) { onDispose { vm.stopPreview() } }
     ReviewContent(
         chapters, { nav.popBackStack() },
-        { at -> vm.play(id, true, at) },
+        { at -> vm.startPreview(id, at) },
         { c -> nav.navigate("editor/${c.id}") },
         { c -> vm.saveChapter(c.copy(reason = null)) },
         { vm.acceptSuggestions(id); nav.popBackStack() },
         { vm.discardSuggestions(id); nav.popBackStack() },
+        previewing, vm::stopPreview,
     )
 }
 
@@ -193,12 +196,20 @@ private fun EditorRoute(vm: AppViewModel, nav: NavHostController, id: Long) {
     LaunchedEffect(id) { chapter = vm.chapter(id) }
     val c = chapter ?: return
     val book by remember(c.bookId) { vm.bookFlow(c.bookId) }.collectAsStateWithLifecycle(null)
+    val siblings by remember(c.bookId, c.chapterSet) { vm.chapters(c.bookId, c.chapterSet) }.collectAsStateWithLifecycle(emptyList())
+    val previewing by vm.previewing.collectAsStateWithLifecycle()
+    val position = siblings.indexOfFirst { it.id == c.id }
+    DisposableEffect(id) { onDispose { vm.stopPreview() } }
     EditorContent(
         c, book?.durationMs ?: Long.MAX_VALUE, { nav.popBackStack() },
-        { at -> vm.play(c.bookId, true, at) },
+        { at -> vm.startPreview(c.bookId, at) },
         { vm.saveChapter(it.copy(reason = null)); nav.popBackStack() },
         { vm.mergeWithNext(c); nav.popBackStack() },
         { vm.deleteChapter(c.id); nav.popBackStack() },
+        { vm.mergeWithPrevious(c); nav.popBackStack() },
+        position > 0,
+        position in 0 until siblings.size - 1,
+        previewing, vm::stopPreview,
     )
 }
 

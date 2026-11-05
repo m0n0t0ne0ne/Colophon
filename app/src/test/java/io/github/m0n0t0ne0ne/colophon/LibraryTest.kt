@@ -96,6 +96,20 @@ class LibraryTest {
         assertEquals(1, tracks.size)
     }
 
+    @Test fun folderPicturesBecomeCoversAndBackCoversLose() {
+        val p = LibraryScanner.plan(dir("Books", dir("1996 - Dune",
+            file("Dune.m4b"), file("back.jpg"), file("scan01.jpg"), file("cover.jpg"), file("notes.txt"))))
+        assertEquals(listOf("cover.jpg", "scan01.jpg", "back.jpg"), p.single().images.map { it.name })
+        val named = LibraryScanner.plan(dir("Books", dir("Dune", file("Dune.m4b"), file("a.png"), file("Dune Front Cover.webp"))))
+        assertEquals("Dune Front Cover.webp", named.single().images.first().name)
+    }
+
+    @Test fun looseBooksOnlyUseAPictureWithTheirOwnName() {
+        val p = LibraryScanner.plan(dir("Books", file("Dune.m4b"), file("Dune.jpg"), file("Piranesi.m4b")))
+        assertEquals(listOf("Dune.jpg"), p.first { it.files.first().name == "Dune.m4b" }.images.map { it.name })
+        assertTrue(p.first { it.files.first().name == "Piranesi.m4b" }.images.isEmpty())
+    }
+
     @Test fun updatingKeepsExistingBooksAndPositions() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val path = context.getDatabasePath("migrate.db").also { it.parentFile?.mkdirs(); it.delete() }
@@ -113,10 +127,11 @@ class LibraryTest {
             db.version = 1
         }
         val room = Room.databaseBuilder(context, ColophonDatabase::class.java, "migrate.db")
-            .addMigrations(ColophonDatabase.MIGRATION_1_2).allowMainThreadQueries().build()
+            .addMigrations(ColophonDatabase.MIGRATION_1_2, ColophonDatabase.MIGRATION_2_3).allowMainThreadQueries().build()
         val book = room.dao().allBooks().single()
         assertEquals(500L, book.positionMs)
         assertFalse(book.userEdited)
+        assertEquals(0L, book.analyzedAt)
         room.close()
     }
 }

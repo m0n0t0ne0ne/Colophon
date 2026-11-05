@@ -1,8 +1,8 @@
-Tidies up how your library is organized.
+Adds folder covers, easier chapter merging, and an Analyzed section.
 
-- A folder of book folders now becomes one series, so a series with subfolders appears as a single entry. A book's own folder is no longer treated as a series.
-- A loose book that names a series in its file name, such as "Wheel of Time, Book 14", joins that series.
-- Duplicate entries are removed, including books you moved to a new folder. Your place in the book is kept.
-- A new refresh button next to the plus button finds new books and removes ones whose files are gone.
+- A picture in a book's folder now becomes its cover, with names like cover or folder preferred. Choosing a cover yourself in Book details always wins.
+- **Merge with previous** in the chapter editor folds a section into the chapter before it.
+- **Stop preview** appears while a preview is playing, and stopping returns you to where you were listening.
+- The Analyzer now separates books into In progress, Not analyzed, and Analyzed.
 
-**To fix your library:** install this update and tap refresh. Details you've edited yourself are left alone.
+**To load folder covers:** install this update and tap refresh in your library.

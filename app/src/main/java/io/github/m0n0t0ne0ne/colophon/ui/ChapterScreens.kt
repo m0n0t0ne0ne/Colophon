@@ -157,11 +157,22 @@ fun AnalyzerContent(
                 Text("Scan the whole book", style = Body)
                 Text("Slower. Off uses the file's chapter markers when it has them.", style = Tiny)
             }
+            Spacer(Modifier.width(12.dp))
             Switch(fullScan, onFullScan, colors = SwitchDefaults.colors(checkedThumbColor = C.Ground, checkedTrackColor = C.Text))
         }
         HorizontalDivider(color = C.Line)
         LazyColumn(Modifier.fillMaxSize()) {
-            items(books, key = { it.id }) { book ->
+            val busy: (Book) -> Boolean = { b -> runs.any { it.bookId == b.id && it.state != WorkInfo.State.FAILED } || b.id in reviews }
+            val active = books.filter(busy)
+            val waiting = books.filter { !busy(it) && it.analyzedAt == 0L }
+            val analyzed = books.filter { !busy(it) && it.analyzedAt > 0L }
+            val sections = listOf("In progress" to active, "Not analyzed" to waiting, "Analyzed" to analyzed).filter { it.second.isNotEmpty() }
+            sections.forEach { (heading, list) ->
+            item(key = "header-$heading") {
+                Text("$heading (${list.size})", style = Small.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium), modifier = Modifier.padding(top = 18.dp, bottom = 6.dp))
+                HorizontalDivider(color = C.Line)
+            }
+            items(list, key = { it.id }) { book ->
                 val run = runs.firstOrNull { it.bookId == book.id }
                 Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Cover(book, 52.dp)
@@ -181,13 +192,14 @@ fun AnalyzerContent(
                         run?.state == WorkInfo.State.RUNNING || run?.state == WorkInfo.State.ENQUEUED ->
                             SecondaryButton("Cancel", Modifier.width(92.dp), 44.dp) { onCancel(book.id) }
                         book.id in reviews -> SecondaryButton("Review", Modifier.width(92.dp), 44.dp, C.Warn) { onReview(book.id) }
-                        else -> SecondaryButton("Analyze", Modifier.width(92.dp), 44.dp) {
+                        else -> SecondaryButton(if (book.analyzedAt > 0L) "Run again" else "Analyze", Modifier.width(92.dp), 44.dp) {
                             if (run?.state == WorkInfo.State.FAILED) onClearFailed()
                             onAnalyze(book.id)
                         }
                     }
                 }
                 HorizontalDivider(color = C.Line)
+            }
             }
             if (books.isEmpty()) item { Text("Add a book to your library first.", style = Small, modifier = Modifier.padding(vertical = 20.dp)) }
         }
@@ -203,6 +215,8 @@ fun ReviewContent(
     onAccept: (Chapter) -> Unit,
     onSave: () -> Unit,
     onDiscard: () -> Unit,
+    previewing: Boolean = false,
+    onStopPreview: () -> Unit = {},
 ) {
     val flagged = chapters.filter { it.reason != null }
     var showAll by rememberSaveable { mutableStateOf(false) }
@@ -230,6 +244,7 @@ fun ReviewContent(
                 HorizontalDivider(color = C.Line)
             }
         }
+        if (previewing) PrimaryButton("Stop preview", Modifier.fillMaxWidth().padding(top = 10.dp), onClick = onStopPreview)
         Row(Modifier.fillMaxWidth().padding(vertical = 10.dp).navigationBarsPadding(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             SecondaryButton("Discard", Modifier.weight(1f), onClick = onDiscard)
             PrimaryButton("Save chapters", Modifier.weight(1f), onClick = onSave)
@@ -246,6 +261,11 @@ fun EditorContent(
     onSave: (Chapter) -> Unit,
     onMerge: () -> Unit,
     onDelete: () -> Unit,
+    onMergePrevious: () -> Unit = {},
+    hasPrevious: Boolean = false,
+    hasNext: Boolean = true,
+    previewing: Boolean = false,
+    onStopPreview: () -> Unit = {},
 ) {
     var title by rememberSaveable { mutableStateOf(chapter.title) }
     var kind by rememberSaveable { mutableStateOf(chapter.kind) }
@@ -276,12 +296,14 @@ fun EditorContent(
                 }
             }
         }
-        SecondaryButton("Preview from here", Modifier.fillMaxWidth(), 44.dp) { onPreview(start) }
+        if (previewing) PrimaryButton("Stop preview", Modifier.fillMaxWidth().height(44.dp), onClick = onStopPreview)
+        else SecondaryButton("Preview from here", Modifier.fillMaxWidth(), 44.dp) { onPreview(start) }
         HorizontalDivider(color = C.Line)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SecondaryButton("Merge with next", Modifier.weight(1f), 44.dp, onClick = onMerge)
-            SecondaryButton("Delete", Modifier.weight(1f), 44.dp, C.Warn) { confirm = true }
+            if (hasPrevious) SecondaryButton("Merge with previous", Modifier.weight(1f), 44.dp, onClick = onMergePrevious)
+            if (hasNext) SecondaryButton("Merge with next", Modifier.weight(1f), 44.dp, onClick = onMerge)
         }
+        SecondaryButton("Delete", Modifier.fillMaxWidth(), 44.dp, C.Warn) { confirm = true }
         Spacer(Modifier.weight(1f))
         Text("Saved separately. Your audio file isn't changed.", style = Small, modifier = Modifier.align(Alignment.CenterHorizontally))
         PrimaryButton("Save", Modifier.fillMaxWidth().padding(bottom = 12.dp).navigationBarsPadding()) {
