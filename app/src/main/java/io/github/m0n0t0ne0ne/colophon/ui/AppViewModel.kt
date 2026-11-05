@@ -76,6 +76,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Set when the media controls ask for the player; ColophonApp opens it once a book is known. */
+    val openPlayerRequested = kotlinx.coroutines.flow.MutableStateFlow(false)
+
     fun play(bookId: Long, autoplay: Boolean = true, at: Long? = null) {
         viewModelScope.launch { hub.open(bookId, autoplay, at) }
     }

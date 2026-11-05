@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import io.github.m0n0t0ne0ne.colophon.core.ChapterHeading
 import io.github.m0n0t0ne0ne.colophon.core.Timeline
 import io.github.m0n0t0ne0ne.colophon.core.formatClock
 import io.github.m0n0t0ne0ne.colophon.data.Book
@@ -115,8 +116,12 @@ fun PlayerContent(
             }
 
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                val heading = chapter?.let { ChapterHeading.of(it.title) }
+                if (heading?.name != null) {
+                    Text(heading.label, style = Small.copy(color = OnArtSoft, fontSize = 14.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
                 Text(
-                    chapter?.title ?: book.title, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                    heading?.name ?: heading?.label ?: book.title, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis,
                     style = TitleMedium.copy(color = OnArt, fontSize = 26.sp, lineHeight = 30.sp),
                 )
                 Text(book.title, style = Small.copy(color = OnArtSoft, fontSize = 14.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)

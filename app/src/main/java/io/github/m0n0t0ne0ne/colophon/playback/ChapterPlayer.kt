@@ -7,6 +7,7 @@ import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import io.github.m0n0t0ne0ne.colophon.core.ChapterHeading
 import io.github.m0n0t0ne0ne.colophon.core.SectionMap
 import io.github.m0n0t0ne0ne.colophon.core.Timeline
 
@@ -118,12 +119,10 @@ class ChapterPlayer(private val raw: Player) : ForwardingPlayer(raw) {
         val sections = active() ?: return metadata
         val index = sections.map.indexAt(globalPosition(sections))
         val title = sections.titles.getOrNull(index) ?: return metadata
-        val book = metadata.title
-        val place = "${index + 1} of ${sections.map.count}"
-        return metadata.buildUpon()
-            .setTitle(title)
-            .setArtist(if (book.isNullOrBlank()) place else "$place · $book")
-            .build()
+        val heading = ChapterHeading.of(title)
+        // A book without chapters keeps its author on the second line.
+        val second = heading.name ?: metadata.title?.takeUnless { it.toString() == title } ?: metadata.artist
+        return metadata.buildUpon().setTitle(heading.label).setArtist(second).build()
     }
 
     private fun inSection(sections: BookSections, globalMs: Long): Long {

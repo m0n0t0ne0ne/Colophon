@@ -40,6 +40,15 @@ fun ColophonApp(vm: AppViewModel) {
         player.error?.let { snackbar.showSnackbar(it); vm.hub.clearError() }
     }
 
+    val openPlayer by vm.openPlayerRequested.collectAsStateWithLifecycle()
+    LaunchedEffect(openPlayer, player.bookId, books) {
+        if (!openPlayer) return@LaunchedEffect
+        val id = player.bookId ?: books.filter { it.lastPlayedAt > 0 }.maxByOrNull { it.lastPlayedAt }?.id
+            ?: return@LaunchedEffect
+        vm.openPlayerRequested.value = false
+        nav.navigate("player/$id") { launchSingleTop = true }
+    }
+
     val current = when {
         route == "library" -> Tab.Library
         route == "seriesList" || route?.startsWith("series/") == true -> Tab.Series

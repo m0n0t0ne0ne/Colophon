@@ -318,3 +318,21 @@ class SectionMap(starts: List<Long>, val totalMs: Long) {
         const val RESTART_WINDOW_MS = 3_000L
     }
 }
+
+/** A chapter title split into its place in the book ("Chapter 16") and its name ("Telling the Wheel"). */
+data class ChapterHeading(val label: String, val name: String?) {
+    companion object {
+        private const val SEPARATOR = """\s*[:.\-–—]+\s+|\s*:\s*"""
+        private const val NUMBERED_WORD = """(?:chapter|ch\.?|part|book|section|volume)"""
+        private val NUMBERED = Regex("""^($NUMBERED_WORD\s+\d+)(?:$SEPARATOR|\s+)(\S.*)$""", RegexOption.IGNORE_CASE)
+        private val SPELLED = Regex("""^($NUMBERED_WORD\s+[\p{L}-]+)(?:$SEPARATOR)(\S.*)$""", RegexOption.IGNORE_CASE)
+        private val NAMED = Regex("""^(prologue|epilogue|introduction|intro|interlude|foreword|afterword)(?:$SEPARATOR)(\S.*)$""", RegexOption.IGNORE_CASE)
+
+        fun of(title: String): ChapterHeading {
+            val clean = title.trim()
+            val match = NUMBERED.find(clean) ?: SPELLED.find(clean) ?: NAMED.find(clean)
+                ?: return ChapterHeading(clean, null)
+            return ChapterHeading(match.groupValues[1], match.groupValues[2].trim())
+        }
+    }
+}

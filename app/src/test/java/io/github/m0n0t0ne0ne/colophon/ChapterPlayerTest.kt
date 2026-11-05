@@ -6,6 +6,7 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.test.core.app.ApplicationProvider
+import io.github.m0n0t0ne0ne.colophon.core.ChapterHeading
 import io.github.m0n0t0ne0ne.colophon.core.SectionMap
 import io.github.m0n0t0ne0ne.colophon.playback.BookSections
 import io.github.m0n0t0ne0ne.colophon.playback.ChapterPlayer
@@ -22,7 +23,7 @@ class ChapterPlayerTest {
     private lateinit var player: ChapterPlayer
     // Two files of 100s; chapters start at 0, 60s and 150s, so the second chapter spans both files.
     private val files = listOf(100_000L, 100_000L)
-    private val sections = BookSections(7, files, SectionMap(listOf(0, 60_000, 150_000), 200_000), listOf("One", "Two", "Three"))
+    private val sections = BookSections(7, files, SectionMap(listOf(0, 60_000, 150_000), 200_000), listOf("Chapter 1: One", "Chapter 2: Two", "Epilogue"))
 
     @Before fun setUp() {
         raw = ExoPlayer.Builder(ApplicationProvider.getApplicationContext()).build()
@@ -42,8 +43,8 @@ class ChapterPlayerTest {
     @Test fun reportsTheChapterNotTheFile() {
         assertEquals(60_000, player.currentPosition)
         assertEquals(90_000, player.duration)
-        assertEquals("Two", player.mediaMetadata.title.toString())
-        assertEquals("2 of 3 · The Book", player.mediaMetadata.artist.toString())
+        assertEquals("Chapter 2", player.mediaMetadata.title.toString())
+        assertEquals("Two", player.mediaMetadata.artist.toString())
     }
 
     @Test fun seekBarIsRelativeToTheChapterAndCrossesFiles() {
@@ -55,7 +56,8 @@ class ChapterPlayerTest {
     @Test fun nextAndPreviousMoveByChapter() {
         player.seekToNext()
         assertEquals(150_000, global())
-        assertEquals("Three", player.mediaMetadata.title.toString())
+        assertEquals("Epilogue", player.mediaMetadata.title.toString())
+        assertEquals("The Book", player.mediaMetadata.artist.toString())
         player.seekToNext() // already in the last chapter
         assertEquals(150_000, global())
         player.seekToPrevious() // right at the start, so the chapter before
@@ -76,6 +78,19 @@ class ChapterPlayerTest {
     @Test fun skipButtonsAreAlwaysAvailable() {
         assertTrue(player.isCommandAvailable(Player.COMMAND_SEEK_TO_NEXT))
         assertTrue(player.availableCommands.contains(Player.COMMAND_SEEK_TO_PREVIOUS))
+    }
+
+    @Test fun splitsChapterTitles() {
+        fun split(t: String) = ChapterHeading.of(t).let { it.label to it.name }
+        assertEquals("Chapter 16" to "Telling the Wheel", split("Chapter 16: Telling the Wheel"))
+        assertEquals("Chapter 16" to "Telling the Wheel", split("Chapter 16 - Telling the Wheel"))
+        assertEquals("Chapter 16" to "Telling the Wheel", split("Chapter 16 Telling the Wheel"))
+        assertEquals("Chapter Three" to "The Road", split("Chapter Three: The Road"))
+        assertEquals("Prologue" to "Ablaze", split("Prologue: Ablaze"))
+        assertEquals("Chapter 16" to null, split("Chapter 16"))
+        assertEquals("Prologue" to null, split("Prologue"))
+        assertEquals("2013 - A Memory of Light" to null, split("2013 - A Memory of Light"))
+        assertEquals("Self-Portrait" to null, split("Self-Portrait"))
     }
 
     @Test fun passesThroughWithoutSections() {

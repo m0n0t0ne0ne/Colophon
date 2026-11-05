@@ -1,5 +1,6 @@
 package io.github.m0n0t0ne0ne.colophon.playback
 
+import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -25,6 +26,7 @@ import androidx.media3.session.SessionResult
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import io.github.m0n0t0ne0ne.colophon.MainActivity
 import io.github.m0n0t0ne0ne.colophon.R
 import io.github.m0n0t0ne0ne.colophon.core.Resume
 import io.github.m0n0t0ne0ne.colophon.core.SectionMap
@@ -156,6 +158,14 @@ class PlaybackService : MediaSessionService() {
         })
         session = MediaSession.Builder(this, chapterPlayer)
             .setCallback(sessionCallback)
+            .setSessionActivity(
+                PendingIntent.getActivity(
+                    this,
+                    0,
+                    Intent(this, MainActivity::class.java).setAction(MainActivity.ACTION_OPEN_PLAYER),
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                ),
+            )
             .setCustomLayout(
                 listOf(
                     jumpButton(CommandButton.ICON_SKIP_BACK_30, "Back 30 seconds", ACTION_JUMP_BACK),
