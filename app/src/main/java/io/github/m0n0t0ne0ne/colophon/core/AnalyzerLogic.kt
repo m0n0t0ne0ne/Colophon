@@ -17,6 +17,7 @@ data class Pause(val startMs: Long, val endMs: Long) {
 class PauseDetector(private val frameMs: Long = 100, private val minPauseMs: Long = 1500) {
     private var speech = 0.0
     private var position = 0L
+    val positionMs: Long get() = position
     private var silentSince = -1L
     val pauses = mutableListOf<Pause>()
 

@@ -62,6 +62,17 @@ class AnalyzeWorker(context: Context, params: WorkerParameters) : CoroutineWorke
         runCatching { setForeground(foreground(detail, percent)) }
     }
 
+    /** Scanning one long file can take many minutes, so progress is reported during the file. */
+    private fun reportScan(doneMs: Long, totalMs: Long) {
+        val now = System.currentTimeMillis()
+        if (now - lastProgress < 2000) return
+        lastProgress = now
+        val percent = (doneMs.coerceAtMost(totalMs) * 45 / totalMs).toInt()
+        val detail = "Finding likely breaks: ${formatLeft(doneMs)} of ${formatLeft(totalMs)}"
+        setProgressAsync(workDataOf(KEY_STAGE to 2, KEY_PERCENT to percent, KEY_DETAIL to detail))
+        runCatching { setForegroundAsync(foreground(detail, percent)) }
+    }
+
     override suspend fun doWork(): Result = withContext(Dispatchers.Default) {
         val dao = ColophonDatabase.get(applicationContext).dao()
         val book = dao.book(bookId) ?: return@withContext Result.failure()
@@ -79,6 +90,7 @@ class AnalyzeWorker(context: Context, params: WorkerParameters) : CoroutineWorke
                 Decoder(applicationContext, Uri.parse(file.uri)).decode(0, null) { samples, count ->
                     if (isStopped) return@decode false
                     feedFrames(detector, samples, count)
+                    reportScan(base + detector.positionMs, total)
                     true
                 }
                 detector.finish()
