@@ -44,7 +44,8 @@ jobs:
             echo "release=true" >> "$GITHUB_OUTPUT"
           fi
       - name: Run tests
-        run: ./gradlew testDebugUnitTest
+        # Robolectric downloads Android runtimes; the Google mirror avoids Maven Central rate limits.
+        run: ./gradlew testDebugUnitTest -Probolectric.mirror=https://maven-central.storage-download.googleapis.com/maven2/
       - name: Build signed APK
         if: steps.version.outputs.release == 'true'
         env:
