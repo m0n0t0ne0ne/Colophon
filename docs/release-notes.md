@@ -1,3 +1,6 @@
-Shows the Colophon icon wherever Android identifies the app that's playing.
+Puts the current chapter in the notification's media player.
 
-- Media widgets, the status bar and the playback notification now show the Colophon icon instead of a generic play button.
+- The player shows the chapter title, which chapter you're on and the book title.
+- The progress bar now covers the current chapter instead of the whole file.
+- Previous and next move between chapters, including from headset buttons.
+- Added buttons to go back or forward 30 seconds.

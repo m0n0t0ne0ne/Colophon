@@ -293,3 +293,28 @@ object SeriesConsolidator {
         return result
     }
 }
+
+/** Sections of a book that the system's media controls treat as separate tracks. */
+class SectionMap(starts: List<Long>, val totalMs: Long) {
+    // Anything before the first marker belongs to the first section.
+    private val starts: List<Long> = starts.ifEmpty { listOf(0L) }.mapIndexed { i, s -> if (i == 0) 0L else s }
+    val count: Int get() = starts.size
+
+    fun indexAt(positionMs: Long): Int = Timeline.chapterAt(starts, positionMs)
+    fun startOf(index: Int): Long = starts[index]
+    fun endOf(index: Int): Long = (starts.getOrNull(index + 1) ?: totalMs).coerceAtLeast(starts[index] + 1)
+
+    /** Where "next" goes, or null in the last section. */
+    fun next(positionMs: Long): Long? = starts.getOrNull(indexAt(positionMs) + 1)
+
+    /** Where "previous" goes: the start of this section, or the one before if already near its start. */
+    fun previous(positionMs: Long): Long? {
+        if (count == 1) return null
+        val index = indexAt(positionMs)
+        return if (positionMs - starts[index] > RESTART_WINDOW_MS || index == 0) starts[index] else starts[index - 1]
+    }
+
+    private companion object {
+        const val RESTART_WINDOW_MS = 3_000L
+    }
+}

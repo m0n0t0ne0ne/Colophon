@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Bundle
 import androidx.annotation.OptIn
 import androidx.core.content.ContextCompat
 import androidx.media3.common.AudioAttributes
@@ -14,14 +15,21 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.session.CommandButton
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaController
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import androidx.media3.session.SessionCommand
+import androidx.media3.session.SessionResult
 import androidx.media3.session.SessionToken
+import com.google.common.util.concurrent.Futures
+import com.google.common.util.concurrent.ListenableFuture
 import io.github.m0n0t0ne0ne.colophon.R
 import io.github.m0n0t0ne0ne.colophon.core.Resume
+import io.github.m0n0t0ne0ne.colophon.core.SectionMap
 import io.github.m0n0t0ne0ne.colophon.core.Timeline
+import io.github.m0n0t0ne0ne.colophon.data.ChapterSet
 import io.github.m0n0t0ne0ne.colophon.data.ColophonDatabase
 import io.github.m0n0t0ne0ne.colophon.data.PositionHistory
 import kotlinx.coroutines.*
@@ -35,8 +43,17 @@ private const val SAVE_INTERVAL_MS = 5_000L
 private const val JUMP_WORTH_REMEMBERING_MS = 60_000L
 private const val FINISHED_MARGIN_MS = 30_000L
 
+private const val JUMP_MS = 30_000L
+private const val ACTION_JUMP_BACK = "io.github.m0n0t0ne0ne.colophon.JUMP_BACK"
+private const val ACTION_JUMP_FORWARD = "io.github.m0n0t0ne0ne.colophon.JUMP_FORWARD"
+
+/** The real player, for the app's screens: the session's player reports positions within a chapter. */
+private object RawPlayer {
+    var current: Player? = null
+}
+
 private fun mediaId(bookId: Long, index: Int) = "$bookId:$index"
-private fun parseId(id: String?): Pair<Long, Int>? {
+internal fun parseId(id: String?): Pair<Long, Int>? {
     val parts = id?.split(':') ?: return null
     return (parts.getOrNull(0)?.toLongOrNull() ?: return null) to (parts.getOrNull(1)?.toIntOrNull() ?: return null)
 }
@@ -47,6 +64,37 @@ class PlaybackService : MediaSessionService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val durations = HashMap<Long, List<Long>>()
     private var saver: Job? = null
+    private var sections: Job? = null
+    private var raw: Player? = null
+    private var sectionsBook: Long? = null
+
+    private val sessionCallback = object : MediaSession.Callback {
+        @OptIn(UnstableApi::class)
+        override fun onConnect(session: MediaSession, controller: MediaSession.ControllerInfo): MediaSession.ConnectionResult =
+            MediaSession.ConnectionResult.AcceptedResultBuilder(session)
+                .setAvailableSessionCommands(
+                    MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon()
+                        .add(SessionCommand(ACTION_JUMP_BACK, Bundle.EMPTY))
+                        .add(SessionCommand(ACTION_JUMP_FORWARD, Bundle.EMPTY))
+                        .build(),
+                )
+                .build()
+
+        override fun onCustomCommand(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            customCommand: SessionCommand,
+            args: Bundle,
+        ): ListenableFuture<SessionResult> {
+            val player = session.player as? ChapterPlayer
+            when (customCommand.customAction) {
+                ACTION_JUMP_BACK -> player?.jump(-JUMP_MS)
+                ACTION_JUMP_FORWARD -> player?.jump(JUMP_MS)
+                else -> return Futures.immediateFuture(SessionResult(SessionResult.RESULT_ERROR_NOT_SUPPORTED))
+            }
+            return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+        }
+    }
 
     @OptIn(UnstableApi::class)
     override fun onCreate() {
@@ -64,10 +112,13 @@ class PlaybackService : MediaSessionService() {
                 true,
             )
             .setHandleAudioBecomingNoisy(true)
-            .setSeekBackIncrementMs(30_000)
-            .setSeekForwardIncrementMs(30_000)
+            .setSeekBackIncrementMs(JUMP_MS)
+            .setSeekForwardIncrementMs(JUMP_MS)
             .setWakeMode(C.WAKE_MODE_LOCAL)
             .build()
+        raw = player
+        RawPlayer.current = player
+        val chapterPlayer = ChapterPlayer(player)
         player.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 scope.launch { save(player) }
@@ -78,6 +129,10 @@ class PlaybackService : MediaSessionService() {
                         save(player)
                     }
                 }
+            }
+
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                watchSections(chapterPlayer, parseId(mediaItem?.mediaId)?.first)
             }
 
             override fun onPositionDiscontinuity(old: Player.PositionInfo, new: Player.PositionInfo, reason: Int) {
@@ -99,7 +154,49 @@ class PlaybackService : MediaSessionService() {
                 }
             }
         })
-        session = MediaSession.Builder(this, player).build()
+        session = MediaSession.Builder(this, chapterPlayer)
+            .setCallback(sessionCallback)
+            .setCustomLayout(
+                listOf(
+                    jumpButton(CommandButton.ICON_SKIP_BACK_30, "Back 30 seconds", ACTION_JUMP_BACK),
+                    jumpButton(CommandButton.ICON_SKIP_FORWARD_30, "Forward 30 seconds", ACTION_JUMP_FORWARD),
+                ),
+            )
+            .build()
+    }
+
+    @OptIn(UnstableApi::class)
+    private fun jumpButton(icon: Int, name: String, action: String): CommandButton =
+        CommandButton.Builder(icon)
+            .setDisplayName(name)
+            .setSessionCommand(SessionCommand(action, Bundle.EMPTY))
+            .build()
+
+    /** Keeps the controls in step with the book's chapters, including edits made while it plays. */
+    private fun watchSections(player: ChapterPlayer, bookId: Long?) {
+        if (bookId == sectionsBook) return
+        sectionsBook = bookId
+        sections?.cancel()
+        player.setBook(null)
+        if (bookId == null) return
+        sections = scope.launch {
+            val dao = ColophonDatabase.get(this@PlaybackService).dao()
+            val files = dao.files(bookId).map { it.durationMs }
+            val book = dao.book(bookId)
+            dao.chaptersFlow(bookId, ChapterSet.CURRENT).collect { chapters ->
+                val total = files.sum()
+                player.setBook(
+                    if (chapters.isNotEmpty()) {
+                        BookSections(bookId, files, SectionMap(chapters.map { it.startMs }, total), chapters.map { it.title })
+                    } else {
+                        // Without chapters, each file is a section; a single file is just the book.
+                        val starts = files.runningFold(0L) { sum, d -> sum + d }.dropLast(1)
+                        val titles = if (files.size > 1) files.indices.map { "Part ${it + 1}" } else listOf(book?.title)
+                        BookSections(bookId, files, SectionMap(starts, total), titles)
+                    },
+                )
+            }
+        }
     }
 
     private suspend fun durationsFor(bookId: Long): List<Long> =
@@ -127,10 +224,12 @@ class PlaybackService : MediaSessionService() {
 
     override fun onDestroy() {
         session?.let { s ->
-            runBlocking { save(s.player) }
-            s.player.release()
+            raw?.let { player -> runBlocking { save(player) } }
             s.release()
+            s.player.release()
         }
+        RawPlayer.current = null
+        raw = null
         session = null
         scope.cancel()
         super.onDestroy()
@@ -186,7 +285,8 @@ class PlayerHub(private val context: Context) {
     }
 
     private fun refresh() {
-        val c = controller ?: return
+        val connected = controller ?: return
+        val c: Player = RawPlayer.current ?: connected
         val parsed = parseId(c.currentMediaItem?.mediaId) ?: return
         if (parsed.first != _state.value.bookId && files.isEmpty()) {
             scope.launch { files = dao.files(parsed.first).map { it.durationMs } }
