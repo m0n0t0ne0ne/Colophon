@@ -19,24 +19,33 @@ import io.github.m0n0t0ne0ne.colophon.data.Chapter
 import io.github.m0n0t0ne0ne.colophon.data.ChapterSet
 import io.github.m0n0t0ne0ne.colophon.data.ColophonDatabase
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import org.vosk.Model
 import org.vosk.Recognizer
 import java.io.File
 import java.nio.ByteOrder
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 import java.util.zip.ZipInputStream
 import kotlin.math.sqrt
 
 private const val MAX_CANDIDATES = 400
-private const val LISTEN_WINDOW_MS = 15_000L
+private const val LISTEN_WINDOW_MS = 12_000L
+private const val SEGMENT_MS = 600_000L
+private const val SEGMENT_OVERLAP_MS = 3_000L
+private const val MIN_MARKERS = 3
+private const val MAX_MARKER_SPACING_MS = 45 * 60_000L
 private const val SAMPLE_RATE = 16_000
 private const val CHANNEL = "analysis"
 
 /** Runs entirely on the phone: decodes the audio, finds pauses, then transcribes just after each one. */
 class AnalyzeWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     private val bookId get() = inputData.getLong(KEY_BOOK, -1)
-    private var lastProgress = 0L
+    @Volatile private var lastProgress = 0L
 
     override suspend fun getForegroundInfo(): ForegroundInfo = foreground("Analyzing audio", 0)
 
@@ -54,25 +63,6 @@ class AnalyzeWorker(context: Context, params: WorkerParameters) : CoroutineWorke
         else ForegroundInfo(7, notification)
     }
 
-    private suspend fun report(stage: Int, percent: Int, detail: String) {
-        val now = System.currentTimeMillis()
-        if (now - lastProgress < 1500) return
-        lastProgress = now
-        setProgress(workDataOf(KEY_STAGE to stage, KEY_PERCENT to percent, KEY_DETAIL to detail))
-        runCatching { setForeground(foreground(detail, percent)) }
-    }
-
-    /** Scanning one long file can take many minutes, so progress is reported during the file. */
-    private fun reportScan(doneMs: Long, totalMs: Long) {
-        val now = System.currentTimeMillis()
-        if (now - lastProgress < 2000) return
-        lastProgress = now
-        val percent = (doneMs.coerceAtMost(totalMs) * 45 / totalMs).toInt()
-        val detail = "Finding likely breaks: ${formatLeft(doneMs)} of ${formatLeft(totalMs)}"
-        setProgressAsync(workDataOf(KEY_STAGE to 2, KEY_PERCENT to percent, KEY_DETAIL to detail))
-        runCatching { setForegroundAsync(foreground(detail, percent)) }
-    }
-
     override suspend fun doWork(): Result = withContext(Dispatchers.Default) {
         val dao = ColophonDatabase.get(applicationContext).dao()
         val book = dao.book(bookId) ?: return@withContext Result.failure()
@@ -82,45 +72,23 @@ class AnalyzeWorker(context: Context, params: WorkerParameters) : CoroutineWorke
 
         try {
             val total = files.sumOf { it.durationMs }.coerceAtLeast(1)
-            val pauses = mutableListOf<Pause>()
-            var offset = 0L
-            for (file in files) {
-                val detector = PauseDetector()
-                val base = offset
-                Decoder(applicationContext, Uri.parse(file.uri)).decode(0, null) { samples, count ->
-                    if (isStopped) return@decode false
-                    feedFrames(detector, samples, count)
-                    reportScan(base + detector.positionMs, total)
-                    true
-                }
-                detector.finish()
-                pauses += detector.pauses.map { Pause(it.startMs + base, it.endMs + base) }
-                offset += file.durationMs
-                report(2, ((offset * 45) / total).toInt(), "Finding likely breaks")
+            val markers = dao.chapters(bookId, ChapterSet.ORIGINAL)
+            val spacing = if (markers.size > 1) total / markers.size else Long.MAX_VALUE
+            val useMarkers = !inputData.getBoolean(KEY_FULL, false) && markers.size >= MIN_MARKERS && spacing <= MAX_MARKER_SPACING_MS
+            val workers = Runtime.getRuntime().availableProcessors().coerceIn(2, 4)
+
+            val targets: List<Target> = if (useMarkers) {
+                markers.map { Target(it.startMs, 0, it.title) }
+            } else {
+                val pauses = scan(files, total, workers)
                 if (isStopped) return@withContext Result.failure()
+                val chosen = pauses.sortedByDescending { it.lengthMs }.take(MAX_CANDIDATES).map { Target(it.endMs, it.lengthMs, null) }
+                val starts = runningStarts(files).map { Target(it, 0, null) }
+                (chosen + starts).sortedBy { it.ms }
             }
 
-            val chosen = pauses.sortedByDescending { it.lengthMs }.take(MAX_CANDIDATES).sortedBy { it.startMs }
-            val fileStarts = runningStarts(files).map { Pause(it, it) }
-            val targets = (chosen + fileStarts).sortedBy { it.endMs }
-
-            val model = Model(ensureModel(applicationContext).absolutePath)
-            val candidates = mutableListOf<Candidate>()
-            try {
-                targets.forEachIndexed { i, pause ->
-                    if (isStopped) return@withContext Result.failure()
-                    val words = transcribe(model, files, pause.endMs)
-                    candidates += Candidate(
-                        startMs = (pause.endMs - 300).coerceAtLeast(0),
-                        pauseMs = pause.lengthMs,
-                        heading = TitleExtractor.extract(words),
-                        firstWords = words.take(5).joinToString(" ") { it.text },
-                    )
-                    report(3, 45 + (i + 1) * 50 / targets.size, "Transcribing ${i + 1} of ${targets.size}")
-                }
-            } finally {
-                model.close()
-            }
+            val candidates = transcribeAll(files, targets, workers, if (useMarkers) 0 else 45)
+            if (isStopped) return@withContext Result.failure()
 
             setProgress(workDataOf(KEY_STAGE to 4, KEY_PERCENT to 97, KEY_DETAIL to "Extracting titles"))
             val suggested = ChapterBuilder.build(candidates, book.durationMs)
@@ -132,6 +100,97 @@ class AnalyzeWorker(context: Context, params: WorkerParameters) : CoroutineWorke
         } catch (e: Exception) {
             Result.failure(workDataOf(KEY_DETAIL to (e.message ?: "Analysis failed")))
         }
+    }
+
+    private class Target(val ms: Long, val pauseMs: Long, val fallbackTitle: String?)
+
+    private fun timeLeft(startedAt: Long, done: Long, total: Long): String {
+        val elapsed = System.currentTimeMillis() - startedAt
+        if (done <= 0 || elapsed < 20_000) return ""
+        val left = elapsed * (total - done).coerceAtLeast(0) / done
+        return ", about ${formatLeft(left.coerceAtLeast(60_000))} left in this step"
+    }
+
+    /** Scans fixed-size segments on several cores. Segments overlap so no pause is cut in half. */
+    private suspend fun scan(files: List<BookFile>, total: Long, workers: Int): List<Pause> = coroutineScope {
+        val segments = ArrayDeque<Triple<BookFile, Long, Long>>()
+        var offset = 0L
+        for (file in files) {
+            var start = 0L
+            while (start < file.durationMs) {
+                segments += Triple(file, offset, start)
+                start += SEGMENT_MS
+            }
+            offset += file.durationMs
+        }
+        val lock = Any()
+        val found = mutableListOf<Pause>()
+        val done = AtomicLong(0)
+        val startedAt = System.currentTimeMillis()
+        List(workers) {
+            launch(Dispatchers.Default) {
+                while (!isStopped) {
+                    val (file, base, start) = synchronized(lock) { segments.removeFirstOrNull() } ?: break
+                    val detector = PauseDetector()
+                    var counted = 0L
+                    Decoder(applicationContext, Uri.parse(file.uri)).decode(start, start + SEGMENT_MS + SEGMENT_OVERLAP_MS) { samples, count ->
+                        if (isStopped) return@decode false
+                        feedFrames(detector, samples, count)
+                        val fresh = detector.positionMs.coerceAtMost(SEGMENT_MS) - counted
+                        counted += fresh
+                        val all = done.addAndGet(fresh)
+                        val time = timeLeft(startedAt, all, total)
+                        reportAsync(2, (all.coerceAtMost(total) * 45 / total).toInt(), "Finding likely breaks: ${formatLeft(all)} of ${formatLeft(total)}$time")
+                        true
+                    }
+                    detector.finish()
+                    synchronized(lock) { found += detector.pauses.map { Pause(it.startMs + start + base, it.endMs + start + base) } }
+                }
+            }
+        }.joinAll()
+        PauseMerger.merge(found)
+    }
+
+    private suspend fun transcribeAll(files: List<BookFile>, targets: List<Target>, workers: Int, floor: Int): List<Candidate> = coroutineScope {
+        reportAsync(3, floor, "Preparing speech recognition")
+        val model = Model(ensureModel(applicationContext).absolutePath)
+        val next = AtomicInteger(0)
+        val done = AtomicInteger(0)
+        val lock = Any()
+        val out = mutableListOf<Candidate>()
+        val startedAt = System.currentTimeMillis()
+        try {
+            List(workers) {
+                launch(Dispatchers.Default) {
+                    while (!isStopped) {
+                        val target = targets.getOrNull(next.getAndIncrement()) ?: break
+                        val words = transcribe(model, files, target.ms)
+                        val candidate = Candidate(
+                            startMs = (target.ms - if (target.pauseMs > 0) 300 else 0).coerceAtLeast(0),
+                            pauseMs = target.pauseMs,
+                            heading = TitleExtractor.extract(words),
+                            firstWords = words.take(5).joinToString(" ") { it.text },
+                            fallbackTitle = target.fallbackTitle,
+                        )
+                        synchronized(lock) { out += candidate }
+                        val n = done.incrementAndGet()
+                        val time = timeLeft(startedAt, n.toLong(), targets.size.toLong())
+                        reportAsync(3, floor + n * (95 - floor) / targets.size, "Transcribing $n of ${targets.size}$time")
+                    }
+                }
+            }.joinAll()
+        } finally {
+            model.close()
+        }
+        out
+    }
+
+    private fun reportAsync(stage: Int, percent: Int, detail: String) {
+        val now = System.currentTimeMillis()
+        if (now - lastProgress < 2000) return
+        lastProgress = now
+        setProgressAsync(workDataOf(KEY_STAGE to stage, KEY_PERCENT to percent, KEY_DETAIL to detail))
+        runCatching { setForegroundAsync(foreground(detail, percent)) }
     }
 
     private fun runningStarts(files: List<BookFile>): List<Long> {
@@ -177,6 +236,7 @@ class AnalyzeWorker(context: Context, params: WorkerParameters) : CoroutineWorke
 
     companion object {
         const val KEY_BOOK = "book"
+        const val KEY_FULL = "full"
         const val KEY_STAGE = "stage"
         const val KEY_PERCENT = "percent"
         const val KEY_DETAIL = "detail"
@@ -184,9 +244,9 @@ class AnalyzeWorker(context: Context, params: WorkerParameters) : CoroutineWorke
 
         fun tagFor(bookId: Long) = "book-$bookId"
 
-        fun enqueue(context: Context, bookId: Long, onlyWhileCharging: Boolean) {
+        fun enqueue(context: Context, bookId: Long, onlyWhileCharging: Boolean, fullScan: Boolean = false) {
             val request = OneTimeWorkRequestBuilder<AnalyzeWorker>()
-                .setInputData(workDataOf(KEY_BOOK to bookId))
+                .setInputData(workDataOf(KEY_BOOK to bookId, KEY_FULL to fullScan))
                 .setConstraints(Constraints.Builder().setRequiresCharging(onlyWhileCharging).build())
                 .addTag(TAG)
                 .addTag(tagFor(bookId))
@@ -242,25 +302,29 @@ class Decoder(private val context: Context, private val uri: Uri) {
             var channels = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
             var encoding = AudioFormat.ENCODING_PCM_16BIT
             var carry = 0.0
-            var pending = ShortArray(SAMPLE_RATE)
+            val pending = ShortArray(SAMPLE_RATE)
             var pendingCount = 0
 
-            while (true) {
-                if (!inputDone) {
-                    val i = codec.dequeueInputBuffer(5_000)
-                    if (i >= 0) {
-                        val buffer = codec.getInputBuffer(i)!!
-                        val size = extractor.readSampleData(buffer, 0)
-                        if (size < 0) {
-                            codec.queueInputBuffer(i, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
-                            inputDone = true
-                        } else {
-                            codec.queueInputBuffer(i, 0, size, extractor.sampleTime, 0)
-                            extractor.advance()
-                        }
+            var shorts = ShortArray(0)
+            var floats = FloatArray(0)
+            decoding@ while (true) {
+                var progressed = false
+                while (!inputDone) {
+                    val i = codec.dequeueInputBuffer(0)
+                    if (i < 0) break
+                    progressed = true
+                    val buffer = codec.getInputBuffer(i)!!
+                    val size = extractor.readSampleData(buffer, 0)
+                    if (size < 0) {
+                        codec.queueInputBuffer(i, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+                        inputDone = true
+                    } else {
+                        codec.queueInputBuffer(i, 0, size, extractor.sampleTime, 0)
+                        extractor.advance()
                     }
                 }
-                val o = codec.dequeueOutputBuffer(info, 5_000)
+                // Wait only when there was nothing to feed, so the codec is never left idle.
+                val o = codec.dequeueOutputBuffer(info, if (progressed) 0 else 2_000)
                 if (o == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
                     val f = codec.outputFormat
                     rate = f.getInteger(MediaFormat.KEY_SAMPLE_RATE)
@@ -270,26 +334,30 @@ class Decoder(private val context: Context, private val uri: Uri) {
                     val timeMs = info.presentationTimeUs / 1000
                     if (toMs != null && timeMs >= toMs) {
                         codec.releaseOutputBuffer(o, false)
-                        break
+                        break@decoding
                     }
                     if (info.size > 0 && timeMs >= fromMs) {
                         val buffer = codec.getOutputBuffer(o)!!.order(ByteOrder.nativeOrder())
                         buffer.position(info.offset)
                         buffer.limit(info.offset + info.size)
                         val step = rate.toDouble() / SAMPLE_RATE
-                        val bytes = if (encoding == AudioFormat.ENCODING_PCM_FLOAT) 4 else 2
-                        val inputFrames = info.size / (bytes * channels)
-                        var frame = 0
-                        while (frame < inputFrames) {
-                            var mix = 0f
-                            repeat(channels) {
-                                mix += if (encoding == AudioFormat.ENCODING_PCM_FLOAT) buffer.float else buffer.short / 32768f
-                            }
-                            mix /= channels
+                        val isFloat = encoding == AudioFormat.ENCODING_PCM_FLOAT
+                        val values = info.size / if (isFloat) 4 else 2
+                        if (isFloat) {
+                            if (floats.size < values) floats = FloatArray(values)
+                            buffer.asFloatBuffer().get(floats, 0, values)
+                        } else {
+                            if (shorts.size < values) shorts = ShortArray(values)
+                            buffer.asShortBuffer().get(shorts, 0, values)
+                        }
+                        var v = 0
+                        while (v + channels <= values) {
                             carry += 1.0
                             if (carry >= step) {
                                 carry -= step
-                                pending[pendingCount++] = (mix.coerceIn(-1f, 1f) * 32767).toInt().toShort()
+                                var mix = 0f
+                                for (c in 0 until channels) mix += if (isFloat) floats[v + c] else shorts[v + c] / 32768f
+                                pending[pendingCount++] = (mix / channels).coerceIn(-1f, 1f).times(32767).toInt().toShort()
                                 if (pendingCount == pending.size) {
                                     val keepGoing = sink(pending, pendingCount)
                                     pendingCount = 0
@@ -299,11 +367,11 @@ class Decoder(private val context: Context, private val uri: Uri) {
                                     }
                                 }
                             }
-                            frame++
+                            v += channels
                         }
                     }
                     codec.releaseOutputBuffer(o, false)
-                    if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) break
+                    if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) break@decoding
                 }
             }
             if (pendingCount > 0) sink(pending, pendingCount)

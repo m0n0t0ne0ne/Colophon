@@ -29,4 +29,18 @@ class TranscriptTest {
         assertEquals("Chapter 3 was not found", result[4].reason)
         assertEquals(SectionKind.EPILOGUE, result.last().kind)
     }
+
+    @Test fun markerKeepsItsLabelWhenNoHeadingIsHeard() {
+        val r = ChapterBuilder.build(listOf(
+            Candidate(0, 0, null, "the wind", "Chapter 37-1"),
+            Candidate(900_000, 0, null, "and then", "Chapter 37-2"),
+            Candidate(1_800_000, 0, TitleExtractor.extract(spoken("chapter thirty eight")), "chapter thirty eight", "Chapter 37-3"),
+        ), 3_000_000)
+        assertEquals(listOf("Chapter 37-1", "Chapter 37-2", "Chapter 38"), r.map { it.title })
+    }
+
+    @Test fun overlappingScanSegmentsJoinPauses() {
+        val merged = PauseMerger.merge(listOf(Pause(10_000, 12_000), Pause(11_000, 13_000), Pause(50_000, 52_000)))
+        assertEquals(listOf(Pause(10_000, 13_000), Pause(50_000, 52_000)), merged)
+    }
 }

@@ -85,9 +85,10 @@ fun ColophonApp(vm: AppViewModel) {
                     val runs by vm.analysis.collectAsStateWithLifecycle()
                     val reviews by vm.reviews.collectAsStateWithLifecycle()
                     val charging by vm.onlyCharging.collectAsStateWithLifecycle()
+                    val full by vm.fullScan.collectAsStateWithLifecycle()
                     AnalyzerContent(
                         books, runs, reviews, charging, vm::setOnlyCharging, vm::analyze, vm::cancelAnalysis,
-                        { nav.navigate("review/$it") }, vm::clearFailedRuns,
+                        { nav.navigate("review/$it") }, vm::clearFailedRuns, full, vm::setFullScan,
                     )
                 }
                 composable("review/{id}", listOf(idArg())) { e -> ReviewRoute(vm, nav, e.id()) }

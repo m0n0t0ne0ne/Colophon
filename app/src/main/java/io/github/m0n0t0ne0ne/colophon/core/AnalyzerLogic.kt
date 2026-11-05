@@ -40,6 +40,20 @@ class PauseDetector(private val frameMs: Long = 100, private val minPauseMs: Lon
     }
 }
 
+object PauseMerger {
+    /** Joins pauses that overlap, which happens where scan segments meet. */
+    fun merge(pauses: List<Pause>): List<Pause> {
+        val out = mutableListOf<Pause>()
+        pauses.sortedBy { it.startMs }.forEach { p ->
+            val last = out.lastOrNull()
+            if (last != null && p.startMs <= last.endMs + 200) {
+                out[out.lastIndex] = Pause(last.startMs, maxOf(last.endMs, p.endMs))
+            } else out += p
+        }
+        return out
+    }
+}
+
 data class Word(val text: String, val startSec: Double, val endSec: Double)
 
 data class Heading(val kind: SectionKind, val number: Int?, val label: String, val name: String, val reason: String?)
@@ -155,7 +169,14 @@ object TitleExtractor {
     }.joinToString(" ")
 }
 
-data class Candidate(val startMs: Long, val pauseMs: Long, val heading: Heading?, val firstWords: String)
+data class Candidate(
+    val startMs: Long,
+    val pauseMs: Long,
+    val heading: Heading?,
+    val firstWords: String,
+    /** The file's own label for this point, kept when no spoken heading is heard. */
+    val fallbackTitle: String? = null,
+)
 
 data class Suggested(val startMs: Long, val title: String, val kind: SectionKind, val reason: String?)
 
@@ -167,7 +188,7 @@ object ChapterBuilder {
         val sorted = candidates.sortedBy { it.startMs }
         val kept = mutableListOf<Candidate>()
         for (c in sorted) {
-            if (c.heading == null && c.pauseMs < UNTITLED_MIN_PAUSE_MS) continue
+            if (c.heading == null && c.fallbackTitle == null && c.pauseMs < UNTITLED_MIN_PAUSE_MS) continue
             val last = kept.lastOrNull()
             val bothHeadings = last?.heading != null && c.heading != null && last.heading.label != c.heading.label
             if (last != null && !bothHeadings && abs(c.startMs - last.startMs) < MERGE_WINDOW_MS) {
@@ -185,6 +206,10 @@ object ChapterBuilder {
         var lastChapter: Int? = null
         for (c in kept) {
             val h = c.heading
+            if (h == null && c.fallbackTitle != null) {
+                out += Suggested(c.startMs, c.fallbackTitle, SectionKind.OTHER, null)
+                continue
+            }
             if (h == null) {
                 untitled++
                 val hint = c.firstWords.takeIf { it.isNotBlank() }?.let { "Begins \"$it\"" } ?: "Clear pause but no title heard"

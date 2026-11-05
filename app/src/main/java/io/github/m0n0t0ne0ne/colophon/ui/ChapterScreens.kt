@@ -137,6 +137,8 @@ fun AnalyzerContent(
     onCancel: (Long) -> Unit,
     onReview: (Long) -> Unit,
     onClearFailed: () -> Unit,
+    fullScan: Boolean = false,
+    onFullScan: (Boolean) -> Unit = {},
 ) {
     Column(Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 20.dp)) {
         Spacer(Modifier.height(8.dp))
@@ -149,6 +151,13 @@ fun AnalyzerContent(
                 Text("Applies the next time you start an analysis.", style = Tiny)
             }
             Switch(onlyCharging, onCharging, colors = SwitchDefaults.colors(checkedThumbColor = C.Ground, checkedTrackColor = C.Text))
+        }
+        Row(Modifier.fillMaxWidth().clickable { onFullScan(!fullScan) }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Scan the whole book", style = Body)
+                Text("Slower. Off uses the file's chapter markers when it has them.", style = Tiny)
+            }
+            Switch(fullScan, onFullScan, colors = SwitchDefaults.colors(checkedThumbColor = C.Ground, checkedTrackColor = C.Text))
         }
         HorizontalDivider(color = C.Line)
         LazyColumn(Modifier.fillMaxSize()) {

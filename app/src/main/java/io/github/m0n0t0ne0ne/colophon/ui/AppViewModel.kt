@@ -42,6 +42,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     )
     val backgroundStrength = MutableStateFlow(prefs.getFloat("bgStrength", 0.6f))
     val onlyCharging = MutableStateFlow(prefs.getBoolean("charging", true))
+    val fullScan = MutableStateFlow(prefs.getBoolean("fullScan", false))
 
     val analysis: StateFlow<List<AnalysisRun>> = WorkManager.getInstance(app)
         .getWorkInfosByTagLiveData(AnalyzeWorker.TAG).asFlow()
@@ -92,7 +93,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         prefs.edit().putBoolean("charging", value).apply()
     }
 
-    fun analyze(bookId: Long) = AnalyzeWorker.enqueue(context, bookId, onlyCharging.value)
+    fun setFullScan(value: Boolean) {
+        fullScan.value = value
+        prefs.edit().putBoolean("fullScan", value).apply()
+    }
+
+    fun analyze(bookId: Long) = AnalyzeWorker.enqueue(context, bookId, onlyCharging.value, fullScan.value)
 
     fun cancelAnalysis(bookId: Long) {
         WorkManager.getInstance(context).cancelUniqueWork("analyze-$bookId")
