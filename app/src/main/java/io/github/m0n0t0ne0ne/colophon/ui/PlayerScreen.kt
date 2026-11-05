@@ -118,12 +118,17 @@ fun PlayerContent(
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                 val heading = chapter?.let { ChapterHeading.of(it.title) }
                 if (heading?.name != null) {
-                    Text(heading.label, style = Small.copy(color = OnArtSoft, fontSize = 14.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        heading.label.uppercase(), maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        style = Tiny.copy(color = OnArtSoft, letterSpacing = 1.8.sp, fontWeight = FontWeight.Medium),
+                    )
+                    Spacer(Modifier.height(10.dp))
                 }
                 Text(
                     heading?.name ?: heading?.label ?: book.title, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis,
                     style = TitleMedium.copy(color = OnArt, fontSize = 26.sp, lineHeight = 30.sp),
                 )
+                Spacer(Modifier.height(12.dp))
                 Text(book.title, style = Small.copy(color = OnArtSoft, fontSize = 14.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
 
