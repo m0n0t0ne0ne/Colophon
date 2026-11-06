@@ -259,6 +259,7 @@ data class PlayerState(
     val playing: Boolean = false,
     val speed: Float = 1f,
     val sleepLeftMs: Long? = null,
+    val sleepChoice: String? = null,
     val error: String? = null,
 )
 
@@ -272,6 +273,9 @@ class PlayerHub(private val context: Context) {
     @Volatile private var sleepRemainingMs = 0L
     @Volatile private var sleepEndOfChapter = false
     private var shake: ShakeDetector? = null
+    /** The notification sound and its volume, set from settings. */
+    @Volatile var chimeSound = Chime.Beep
+    @Volatile var chimeVolume = 70
     /** Seconds to skip back when resuming after a long pause; set from settings. */
     @Volatile var longAwayRewindSec = 15
     private val _state = MutableStateFlow(PlayerState())
@@ -378,17 +382,18 @@ class PlayerHub(private val context: Context) {
      * A duration timer only runs down while the book is playing. An end-of-chapter timer follows
      * the current chapter, so skipping re-targets it and pausing the book holds it.
      */
-    fun setSleep(durationMs: Long?, chime: Boolean = false, shakeExtendMs: Long = 0L, endOfChapter: Boolean = false) {
+    fun setSleep(durationMs: Long?, chime: Boolean = false, shakeExtendMs: Long = 0L, endOfChapter: Boolean = false, choice: String? = null) {
         sleepJob?.cancel()
         stopShake()
         if (!endOfChapter && (durationMs == null || durationMs <= 0)) {
             sleepRemainingMs = 0
             sleepEndOfChapter = false
-            _state.value = _state.value.copy(sleepLeftMs = null)
+            _state.value = _state.value.copy(sleepLeftMs = null, sleepChoice = null)
             return
         }
         sleepEndOfChapter = endOfChapter
         sleepRemainingMs = durationMs ?: 0
+        _state.value = _state.value.copy(sleepChoice = choice)
         if (shakeExtendMs > 0) startShake(shakeExtendMs)
         var chimed = false
         sleepJob = scope.launch {
@@ -405,7 +410,7 @@ class PlayerHub(private val context: Context) {
             controller?.pause()
             stopShake()
             sleepEndOfChapter = false
-            _state.value = _state.value.copy(sleepLeftMs = null)
+            _state.value = _state.value.copy(sleepLeftMs = null, sleepChoice = null)
         }
     }
 
@@ -437,11 +442,17 @@ class PlayerHub(private val context: Context) {
         manager.registerListener(detector, sensor, SensorManager.SENSOR_DELAY_UI)
     }
 
-    private fun playShakeAck() {
+    /** Plays the chosen notification sound at the chosen volume. */
+    fun preview() = playTone()
+
+    private fun playShakeAck() = playTone()
+
+    private fun playTone() {
+        val sound = chimeSound
         runCatching {
-            val tone = ToneGenerator(AudioManager.STREAM_MUSIC, 80)
-            tone.startTone(ToneGenerator.TONE_PROP_ACK, 300)
-            scope.launch { delay(600); runCatching { tone.release() } }
+            val tone = ToneGenerator(AudioManager.STREAM_MUSIC, chimeVolume.coerceIn(1, 100))
+            tone.startTone(sound.tone, sound.ms)
+            scope.launch { delay(sound.ms + 300L); runCatching { tone.release() } }
         }
     }
 
@@ -450,13 +461,7 @@ class PlayerHub(private val context: Context) {
         shake = null
     }
 
-    private fun playChime() {
-        runCatching {
-            val tone = ToneGenerator(AudioManager.STREAM_MUSIC, 70)
-            tone.startTone(ToneGenerator.TONE_PROP_BEEP, 220)
-            scope.launch { delay(500); runCatching { tone.release() } }
-        }
-    }
+    private fun playChime() = playTone()
 
     fun clearError() { _state.value = _state.value.copy(error = null) }
 

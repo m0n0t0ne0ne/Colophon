@@ -46,7 +46,7 @@ data class PlayerActions(
     val onSeekBy: (Long) -> Unit = {},
     val onSeekTo: (Long) -> Unit = {},
     val onSpeed: (Float) -> Unit = {},
-    val onSleep: (Long?) -> Unit = {},
+    val onSleep: (Int?) -> Unit = {},
     val onSleepChapter: () -> Unit = {},
     val onSettings: () -> Unit = {},
     val onBookmark: () -> Unit = {},
@@ -197,11 +197,11 @@ fun PlayerContent(
             "sleep" -> Sheet("Sleep timer", { sheet = null }) {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     listOf(15, 30, 45, 60).forEach { m ->
-                        ChoiceChip("$m min", false, Modifier.weight(1f)) { actions.onSleep(m * 60_000L); sheet = null }
+                        ChoiceChip("$m min", state.sleepChoice == m.toString(), Modifier.weight(1f)) { actions.onSleep(m); sheet = null }
                     }
                 }
                 if (chapter != null && chapterEnd > position) {
-                    ChoiceChip("End of chapter", false, Modifier.fillMaxWidth()) { actions.onSleepChapter(); sheet = null }
+                    ChoiceChip("End of chapter", state.sleepChoice == "chapter", Modifier.fillMaxWidth()) { actions.onSleepChapter(); sheet = null }
                 }
                 if (state.sleepLeftMs != null) SecondaryButton("Turn off", Modifier.fillMaxWidth()) { actions.onSleep(null); sheet = null }
             }

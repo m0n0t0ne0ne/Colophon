@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
+import io.github.m0n0t0ne0ne.colophon.playback.Chime
 import android.net.Uri
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.AndroidViewModel
@@ -38,7 +39,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // One-time cleanup of jump-back entries left at the very start or end of a book.
         viewModelScope.launch { dao.pruneTrivialHistory() }
         hub.longAwayRewindSec = prefs.getInt("resumeRewindSec", 15)
+        hub.chimeSound = Chime.from(prefs.getString("sleepSound", null))
+        hub.chimeVolume = prefs.getInt("sleepVolume", 70)
     }
+
+    fun setSleepSound(sound: Chime) {
+        sleepSound.value = sound
+        hub.chimeSound = sound
+        prefs.edit().putString("sleepSound", sound.name).apply()
+    }
+
+    fun setSleepVolume(percent: Int) {
+        val v = percent.coerceIn(0, 100)
+        sleepVolume.value = v
+        hub.chimeVolume = v
+        prefs.edit().putInt("sleepVolume", v).apply()
+    }
+
+    fun previewSound() = hub.preview()
 
     fun setResumeRewind(sec: Int) {
         resumeRewindSec.value = sec
@@ -50,13 +68,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setSleepShake(on: Boolean) { sleepShake.value = on; prefs.edit().putBoolean("sleepShake", on).apply() }
     fun setSleepShakeMin(min: Int) { sleepShakeMin.value = min; prefs.edit().putInt("sleepShakeMin", min).apply() }
 
-    /** Starts a sleep timer, applying the listener's chime and shake settings. */
-    fun setSleep(durationMs: Long?) {
-        hub.setSleep(durationMs, chime = sleepChime.value, shakeExtendMs = shakeExtendMs())
+    /** Starts a sleep timer for a number of minutes, or clears it when null. */
+    fun setSleep(minutes: Int?) {
+        if (minutes == null) { hub.setSleep(null); return }
+        hub.setSleep(minutes * 60_000L, chime = sleepChime.value, shakeExtendMs = shakeExtendMs(), choice = minutes.toString())
     }
 
     fun setSleepEndOfChapter() {
-        hub.setSleep(0L, chime = sleepChime.value, shakeExtendMs = shakeExtendMs(), endOfChapter = true)
+        hub.setSleep(0L, chime = sleepChime.value, shakeExtendMs = shakeExtendMs(), endOfChapter = true, choice = "chapter")
     }
 
     private fun shakeExtendMs(): Long = if (sleepShake.value) sleepShakeMin.value * 60_000L else 0L
@@ -77,6 +96,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val sleepChime = MutableStateFlow(prefs.getBoolean("sleepChime", true))
     val sleepShake = MutableStateFlow(prefs.getBoolean("sleepShake", false))
     val sleepShakeMin = MutableStateFlow(prefs.getInt("sleepShakeMin", 5))
+    val sleepSound = MutableStateFlow(Chime.from(prefs.getString("sleepSound", null)))
+    val sleepVolume = MutableStateFlow(prefs.getInt("sleepVolume", 70))
 
     val analysis: StateFlow<List<AnalysisRun>> = WorkManager.getInstance(app)
         .getWorkInfosByTagLiveData(AnalyzeWorker.TAG).asFlow()

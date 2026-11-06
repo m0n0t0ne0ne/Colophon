@@ -5,9 +5,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import io.github.m0n0t0ne0ne.colophon.playback.Chime
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -24,6 +27,11 @@ fun SettingsScreen(
     onSleepShake: (Boolean) -> Unit,
     sleepShakeMin: Int,
     onSleepShakeMin: (Int) -> Unit,
+    sound: Chime,
+    onSound: (Chime) -> Unit,
+    volume: Int,
+    onVolume: (Int) -> Unit,
+    onPreview: () -> Unit,
     onBack: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 20.dp)) {
@@ -47,6 +55,26 @@ fun SettingsScreen(
                 Text("Each shake adds", style = Body, modifier = Modifier.padding(top = 4.dp))
                 ChipRow(listOf(1 to "1 min", 5 to "5 min", 10 to "10 min", 15 to "15 min"), sleepShakeMin, onSleepShakeMin)
             }
+
+            HorizontalDivider(color = C.Line, modifier = Modifier.padding(vertical = 10.dp))
+
+            SectionLabel("NOTIFICATION SOUND")
+            Text("Used for the chime and the shake confirmation. Tap one to hear it.", style = Tiny)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Chime.entries.forEach { option ->
+                    ChoiceChip(option.label, sound == option, Modifier.weight(1f)) { onSound(option) }
+                }
+            }
+            Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Volume", style = Body)
+                Text("$volume%", style = Small)
+            }
+            Slider(
+                value = volume / 100f,
+                onValueChange = { onVolume((it * 100).toInt()) },
+                colors = SliderDefaults.colors(thumbColor = C.Text, activeTrackColor = C.Text, inactiveTrackColor = C.Border),
+            )
+            SecondaryButton("Preview sound", Modifier.fillMaxWidth()) { onPreview() }
             Spacer(Modifier.height(16.dp))
         }
     }

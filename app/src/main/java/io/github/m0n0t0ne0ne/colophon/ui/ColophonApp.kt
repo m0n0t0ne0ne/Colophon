@@ -263,9 +263,12 @@ private fun SettingsRoute(vm: AppViewModel, nav: NavHostController) {
     val chime by vm.sleepChime.collectAsStateWithLifecycle()
     val shake by vm.sleepShake.collectAsStateWithLifecycle()
     val shakeMin by vm.sleepShakeMin.collectAsStateWithLifecycle()
+    val sound by vm.sleepSound.collectAsStateWithLifecycle()
+    val volume by vm.sleepVolume.collectAsStateWithLifecycle()
     SettingsScreen(
         rewind, vm::setResumeRewind, chime, vm::setSleepChime,
         shake, vm::setSleepShake, shakeMin, vm::setSleepShakeMin,
+        sound, { vm.setSleepSound(it); vm.previewSound() }, volume, vm::setSleepVolume, vm::previewSound,
     ) { nav.popBackStack() }
 }
 
