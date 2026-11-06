@@ -95,12 +95,12 @@ object Timeline {
 }
 
 object Resume {
-    /** The longer you have been away, the further back the book starts. */
-    fun rewindMs(awayMs: Long): Long = when {
+    /** The longer you have been away, the further back the book starts. The long-away
+     *  amount (5 minutes or more) is set by the listener; shorter gaps get a small nudge. */
+    fun rewindMs(awayMs: Long, longAwaySec: Int = 15): Long = when {
         awayMs < 60_000 -> 2_000
-        awayMs < 3_600_000 -> 5_000
-        awayMs < 86_400_000 -> 15_000
-        else -> 30_000
+        awayMs < 300_000 -> 5_000
+        else -> longAwaySec * 1000L
     }
 }
 

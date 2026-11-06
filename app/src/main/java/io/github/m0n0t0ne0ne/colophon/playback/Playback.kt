@@ -4,6 +4,10 @@ import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.hardware.Sensor
+import android.hardware.SensorManager
+import android.media.AudioManager
+import android.media.ToneGenerator
 import android.net.Uri
 import android.os.Bundle
 import androidx.annotation.OptIn
@@ -265,6 +269,10 @@ class PlayerHub(private val context: Context) {
     private var controller: MediaController? = null
     private var files: List<Long> = emptyList()
     private var sleepJob: Job? = null
+    @Volatile private var sleepRemainingMs = 0L
+    private var shake: ShakeDetector? = null
+    /** Seconds to skip back when resuming after a long pause; set from settings. */
+    @Volatile var longAwayRewindSec = 15
     private val _state = MutableStateFlow(PlayerState())
     val state: StateFlow<PlayerState> = _state.asStateFlow()
 
@@ -337,7 +345,7 @@ class PlayerHub(private val context: Context) {
                 .build()
         }
         val away = if (book.lastPlayedAt > 0) System.currentTimeMillis() - book.lastPlayedAt else 0
-        val start = startAtMs ?: if (book.finished) 0 else (book.positionMs - Resume.rewindMs(away)).coerceAtLeast(0)
+        val start = startAtMs ?: if (book.finished) 0 else (book.positionMs - Resume.rewindMs(away, longAwayRewindSec)).coerceAtLeast(0)
         val (index, offset) = Timeline.locate(files, start)
         c.setMediaItems(items, index, offset)
         c.setPlaybackSpeed(book.speed)
@@ -364,21 +372,51 @@ class PlayerHub(private val context: Context) {
         _state.value.bookId?.let { id -> scope.launch { dao.saveSpeed(id, speed) } }
     }
 
-    fun setSleep(minutes: Int?) {
+    /** Starts (or clears) a sleep timer. Optionally chimes near the end and extends on a shake. */
+    fun setSleep(durationMs: Long?, chime: Boolean = false, shakeExtendMs: Long = 0L) {
         sleepJob?.cancel()
-        if (minutes == null) {
+        stopShake()
+        if (durationMs == null || durationMs <= 0) {
+            sleepRemainingMs = 0
             _state.value = _state.value.copy(sleepLeftMs = null)
             return
         }
+        sleepRemainingMs = durationMs
+        if (shakeExtendMs > 0) startShake(shakeExtendMs)
+        var chimed = false
         sleepJob = scope.launch {
-            var left = minutes * 60_000L
-            while (left > 0) {
+            while (sleepRemainingMs > 0) {
+                val left = sleepRemainingMs
                 _state.value = _state.value.copy(sleepLeftMs = left)
+                if (chime && !chimed && left <= 60_000) { chimed = true; playChime() }
+                if (left > 60_000) chimed = false
                 delay(1000)
-                left -= 1000
+                sleepRemainingMs -= 1000
             }
             controller?.pause()
+            stopShake()
             _state.value = _state.value.copy(sleepLeftMs = null)
+        }
+    }
+
+    private fun startShake(extendMs: Long) {
+        val manager = context.getSystemService(SensorManager::class.java) ?: return
+        val sensor = manager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) ?: return
+        val detector = ShakeDetector { if (sleepRemainingMs > 0) sleepRemainingMs += extendMs }
+        shake = detector
+        manager.registerListener(detector, sensor, SensorManager.SENSOR_DELAY_UI)
+    }
+
+    private fun stopShake() {
+        shake?.let { context.getSystemService(SensorManager::class.java)?.unregisterListener(it) }
+        shake = null
+    }
+
+    private fun playChime() {
+        runCatching {
+            val tone = ToneGenerator(AudioManager.STREAM_MUSIC, 70)
+            tone.startTone(ToneGenerator.TONE_PROP_BEEP, 220)
+            scope.launch { delay(500); runCatching { tone.release() } }
         }
     }
 

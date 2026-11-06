@@ -46,7 +46,8 @@ data class PlayerActions(
     val onSeekBy: (Long) -> Unit = {},
     val onSeekTo: (Long) -> Unit = {},
     val onSpeed: (Float) -> Unit = {},
-    val onSleep: (Int?) -> Unit = {},
+    val onSleep: (Long?) -> Unit = {},
+    val onSettings: () -> Unit = {},
     val onBookmark: () -> Unit = {},
     val onMode: (BackgroundMode) -> Unit = {},
     val onStrength: (Float) -> Unit = {},
@@ -96,7 +97,7 @@ fun PlayerContent(
                     IconBtn(Ic.More, "More options", OnArt) { menu = true }
                     DropdownMenu(menu, { menu = false }) {
                         DropdownMenuItem(text = { Text("Book details and cover") }, onClick = { menu = false; actions.onDetails() })
-                        DropdownMenuItem(text = { Text("Jump back") }, onClick = { menu = false; sheet = "jump" })
+                        DropdownMenuItem(text = { Text("Settings") }, onClick = { menu = false; actions.onSettings() })
                     }
                 }
             }
@@ -195,18 +196,13 @@ fun PlayerContent(
             "sleep" -> Sheet("Sleep timer", { sheet = null }) {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     listOf(15, 30, 45, 60).forEach { m ->
-                        ChoiceChip("$m min", false, Modifier.weight(1f)) { actions.onSleep(m); sheet = null }
+                        ChoiceChip("$m min", false, Modifier.weight(1f)) { actions.onSleep(m * 60_000L); sheet = null }
                     }
                 }
-                if (state.sleepLeftMs != null) SecondaryButton("Turn off", Modifier.fillMaxWidth()) { actions.onSleep(null); sheet = null }
-            }
-            "jump" -> Sheet("Jump back", { sheet = null }) {
-                if (jumps.isEmpty()) Text("Your place before a big skip will appear here.", style = Small)
-                jumps.forEach { at ->
-                    Row(
-                        Modifier.fillMaxWidth().clickable { actions.onSeekTo(at); sheet = null }.padding(vertical = 12.dp),
-                    ) { Text(formatLong(at), style = Body) }
+                if (chapter != null && chapterEnd > position) {
+                    ChoiceChip("End of chapter", false, Modifier.fillMaxWidth()) { actions.onSleep(chapterEnd - position); sheet = null }
                 }
+                if (state.sleepLeftMs != null) SecondaryButton("Turn off", Modifier.fillMaxWidth()) { actions.onSleep(null); sheet = null }
             }
         }
     }

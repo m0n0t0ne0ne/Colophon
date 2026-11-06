@@ -176,3 +176,13 @@ class JumpHistoryTest {
         assertTrue(JumpHistory.shouldRemember(fromMs = 500_000, toMs = 100_000, totalMs = 0, lastMs = null))
     }
 }
+
+class ResumeRewindTest {
+    @org.junit.Test fun longAwayUsesTheSetting() {
+        assertEquals(2_000L, Resume.rewindMs(30_000, 15))           // under a minute: small nudge
+        assertEquals(5_000L, Resume.rewindMs(120_000, 15))          // under five minutes
+        assertEquals(15_000L, Resume.rewindMs(600_000, 15))         // long away: the setting
+        assertEquals(60_000L, Resume.rewindMs(3_600_000, 60))       // a different setting
+        assertEquals(0L, Resume.rewindMs(3_600_000, 0))             // off
+    }
+}

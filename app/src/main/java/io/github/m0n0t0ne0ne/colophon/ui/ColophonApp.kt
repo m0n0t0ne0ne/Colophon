@@ -112,6 +112,7 @@ fun ColophonApp(vm: AppViewModel) {
                 composable("editor/{id}", listOf(idArg())) { e -> EditorRoute(vm, nav, e.id()) }
                 composable("details/{id}", listOf(idArg())) { e -> DetailsRoute(vm, nav, e.id()) }
                 composable("tags/{id}", listOf(idArg())) { e -> TagsRoute(vm, nav, e.id()) }
+                composable("settings") { SettingsRoute(vm, nav) }
             }
         }
     }
@@ -168,7 +169,8 @@ private fun PlayerRoute(vm: AppViewModel, nav: NavHostController, id: Long) {
             onSeekBy = vm.hub::seekBy,
             onSeekTo = vm.hub::seekTo,
             onSpeed = vm.hub::setSpeed,
-            onSleep = vm.hub::setSleep,
+            onSleep = { vm.setSleep(it) },
+            onSettings = { nav.navigate("settings") },
             onBookmark = { vm.addBookmark(id, shown.positionMs) },
             onMode = vm::setBackground,
             onStrength = vm::setStrength,
@@ -252,6 +254,18 @@ private fun DetailsRoute(vm: AppViewModel, nav: NavHostController, id: Long) {
             { nav.navigate("tags/$id") },
         )
     }
+}
+
+@Composable
+private fun SettingsRoute(vm: AppViewModel, nav: NavHostController) {
+    val rewind by vm.resumeRewindSec.collectAsStateWithLifecycle()
+    val chime by vm.sleepChime.collectAsStateWithLifecycle()
+    val shake by vm.sleepShake.collectAsStateWithLifecycle()
+    val shakeMin by vm.sleepShakeMin.collectAsStateWithLifecycle()
+    SettingsScreen(
+        rewind, vm::setResumeRewind, chime, vm::setSleepChime,
+        shake, vm::setSleepShake, shakeMin, vm::setSleepShakeMin,
+    ) { nav.popBackStack() }
 }
 
 @Composable

@@ -37,6 +37,26 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     init {
         // One-time cleanup of jump-back entries left at the very start or end of a book.
         viewModelScope.launch { dao.pruneTrivialHistory() }
+        hub.longAwayRewindSec = prefs.getInt("resumeRewindSec", 15)
+    }
+
+    fun setResumeRewind(sec: Int) {
+        resumeRewindSec.value = sec
+        hub.longAwayRewindSec = sec
+        prefs.edit().putInt("resumeRewindSec", sec).apply()
+    }
+
+    fun setSleepChime(on: Boolean) { sleepChime.value = on; prefs.edit().putBoolean("sleepChime", on).apply() }
+    fun setSleepShake(on: Boolean) { sleepShake.value = on; prefs.edit().putBoolean("sleepShake", on).apply() }
+    fun setSleepShakeMin(min: Int) { sleepShakeMin.value = min; prefs.edit().putInt("sleepShakeMin", min).apply() }
+
+    /** Starts a sleep timer, applying the listener's chime and shake settings. */
+    fun setSleep(durationMs: Long?) {
+        hub.setSleep(
+            durationMs,
+            chime = sleepChime.value,
+            shakeExtendMs = if (sleepShake.value) sleepShakeMin.value * 60_000L else 0L,
+        )
     }
     val reviews: StateFlow<List<Long>> = dao.booksWithSuggestions().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
@@ -51,6 +71,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val backgroundStrength = MutableStateFlow(prefs.getFloat("bgStrength", 0.6f))
     val onlyCharging = MutableStateFlow(prefs.getBoolean("charging", true))
     val fullScan = MutableStateFlow(prefs.getBoolean("fullScan", false))
+    val resumeRewindSec = MutableStateFlow(prefs.getInt("resumeRewindSec", 15))
+    val sleepChime = MutableStateFlow(prefs.getBoolean("sleepChime", true))
+    val sleepShake = MutableStateFlow(prefs.getBoolean("sleepShake", false))
+    val sleepShakeMin = MutableStateFlow(prefs.getInt("sleepShakeMin", 5))
 
     val analysis: StateFlow<List<AnalysisRun>> = WorkManager.getInstance(app)
         .getWorkInfosByTagLiveData(AnalyzeWorker.TAG).asFlow()
