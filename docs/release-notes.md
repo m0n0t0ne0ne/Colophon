@@ -1,5 +1,4 @@
-Fixes the Jump back list so it only shows real places you left.
+Adds an Add books button and a file tag viewer.
 
-- Jump back no longer fills up with 0:00:00 or end-of-book entries.
-- Only a genuine jump of a minute or more is saved, and repeats are skipped.
-- Existing stray entries are cleared automatically.
+- An Add books button now sits at the bottom of the library, alongside the ⊕ menu.
+- Book details has a View file tags screen showing all the metadata read from each audio file.

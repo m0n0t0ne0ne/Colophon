@@ -108,6 +108,7 @@ fun ColophonApp(vm: AppViewModel) {
                 composable("review/{id}", listOf(idArg())) { e -> ReviewRoute(vm, nav, e.id()) }
                 composable("editor/{id}", listOf(idArg())) { e -> EditorRoute(vm, nav, e.id()) }
                 composable("details/{id}", listOf(idArg())) { e -> DetailsRoute(vm, nav, e.id()) }
+                composable("tags/{id}", listOf(idArg())) { e -> TagsRoute(vm, nav, e.id()) }
             }
         }
     }
@@ -245,6 +246,14 @@ private fun DetailsRoute(vm: AppViewModel, nav: NavHostController, id: Long) {
             { done -> pending = done; picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
             { updated, whole -> vm.saveBook(updated, whole); nav.popBackStack() },
             { vm.removeBook(id); nav.go("library") },
+            { nav.navigate("tags/$id") },
         )
     }
+}
+
+@Composable
+private fun TagsRoute(vm: AppViewModel, nav: NavHostController, id: Long) {
+    val book by remember(id) { vm.bookFlow(id) }.collectAsStateWithLifecycle(null)
+    val tags by produceState<List<FileTags>?>(null, id) { value = vm.fileTags(id) }
+    TagsScreen(book?.title.orEmpty(), tags) { nav.popBackStack() }
 }

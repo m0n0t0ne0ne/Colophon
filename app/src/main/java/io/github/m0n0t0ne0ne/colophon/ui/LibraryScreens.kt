@@ -104,6 +104,21 @@ fun LibraryContent(
                     StandaloneTile(book, { onOpenBook(book) }, { onEditBook(book) }, { onRemoveBook(book) })
                 }
             }
+            item(span = { GridItemSpan(3) }) {
+                Box(Modifier.fillMaxWidth().padding(top = 20.dp)) { AddBooksButton(onAddFolder, onAddFiles) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AddBooksButton(onAddFolder: () -> Unit, onAddFiles: () -> Unit) {
+    var menu by remember { mutableStateOf(false) }
+    Box {
+        SecondaryButton("Add books", Modifier.fillMaxWidth()) { menu = true }
+        DropdownMenu(menu, { menu = false }) {
+            DropdownMenuItem(text = { Text("Add a folder") }, onClick = { menu = false; onAddFolder() })
+            DropdownMenuItem(text = { Text("Add files") }, onClick = { menu = false; onAddFiles() })
         }
     }
 }
@@ -294,6 +309,7 @@ fun DetailsScreen(
     onPickCover: (((String?) -> Unit)) -> Unit,
     onSave: (Book, Boolean) -> Unit,
     onRemove: () -> Unit,
+    onViewTags: () -> Unit = {},
 ) {
     var title by rememberSaveable { mutableStateOf(book.title) }
     var author by rememberSaveable { mutableStateOf(book.author) }
@@ -324,6 +340,7 @@ fun DetailsScreen(
             if (series.isNotBlank() && cover != book.coverPath) {
                 UnderlineTabs(listOf("Cover: this book", "Whole series"), whole) { whole = it }
             }
+            SecondaryButton("View file tags", Modifier.fillMaxWidth()) { onViewTags() }
             TextButton(onClick = { confirm = true }) { Text("Remove from library", color = C.Warn) }
             Text("This removes the book from Colophon. Your audio file stays on your phone.", style = Tiny)
         }
@@ -354,4 +371,31 @@ fun Field(label: String, value: String, modifier: Modifier = Modifier, keyboard:
         value, onChange, label = { Text(label) }, singleLine = true, modifier = modifier.fillMaxWidth(),
         keyboardOptions = KeyboardOptions(keyboardType = keyboard), shape = RoundedCornerShape(6.dp),
     )
+}
+
+@Composable
+fun TagsScreen(title: String, files: List<FileTags>?, onBack: () -> Unit) {
+    Column(Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 20.dp)) {
+        HeaderRow("File tags", onBack)
+        Text(title, style = TitleLarge)
+        Text("Read from your audio files. Colophon doesn't change them.", style = Small, modifier = Modifier.padding(top = 4.dp, bottom = 8.dp))
+        when {
+            files == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = C.Accent) }
+            files.isEmpty() -> Text("No tags found in this book's files.", style = Small)
+            else -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+                files.forEachIndexed { i, file ->
+                    item {
+                        Text(file.name, style = BookTitle.copy(fontSize = 16.sp), modifier = Modifier.padding(top = if (i == 0) 4.dp else 20.dp, bottom = 6.dp))
+                    }
+                    items(file.rows) { row ->
+                        Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            Text(row.label, style = Small, modifier = Modifier.width(120.dp))
+                            Text(row.value, style = Body, modifier = Modifier.weight(1f))
+                        }
+                        HorizontalDivider(color = Color0)
+                    }
+                }
+            }
+        }
+    }
 }

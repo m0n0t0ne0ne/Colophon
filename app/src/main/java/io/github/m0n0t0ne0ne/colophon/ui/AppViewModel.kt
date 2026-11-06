@@ -3,6 +3,7 @@ package io.github.m0n0t0ne0ne.colophon.ui
 import android.app.Application
 import android.content.Context
 import android.graphics.BitmapFactory
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.AndroidViewModel
@@ -140,6 +141,55 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun chapters(id: Long, set: String) = dao.chaptersFlow(id, set)
     fun bookmarks(id: Long) = dao.bookmarks(id)
     fun history(id: Long) = dao.history(id)
+
+    /** Everything the file's own metadata reports, read fresh from each audio file. */
+    suspend fun fileTags(bookId: Long): List<FileTags> = withContext(Dispatchers.IO) {
+        val keys = listOf(
+            "Title" to MediaMetadataRetriever.METADATA_KEY_TITLE,
+            "Album" to MediaMetadataRetriever.METADATA_KEY_ALBUM,
+            "Album artist" to MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST,
+            "Artist" to MediaMetadataRetriever.METADATA_KEY_ARTIST,
+            "Author" to MediaMetadataRetriever.METADATA_KEY_AUTHOR,
+            "Composer" to MediaMetadataRetriever.METADATA_KEY_COMPOSER,
+            "Writer" to MediaMetadataRetriever.METADATA_KEY_WRITER,
+            "Genre" to MediaMetadataRetriever.METADATA_KEY_GENRE,
+            "Year" to MediaMetadataRetriever.METADATA_KEY_YEAR,
+            "Date" to MediaMetadataRetriever.METADATA_KEY_DATE,
+            "Track" to MediaMetadataRetriever.METADATA_KEY_CD_TRACK_NUMBER,
+            "Track count" to MediaMetadataRetriever.METADATA_KEY_NUM_TRACKS,
+            "Disc" to MediaMetadataRetriever.METADATA_KEY_DISC_NUMBER,
+            "Type" to MediaMetadataRetriever.METADATA_KEY_MIMETYPE,
+            "Bitrate" to MediaMetadataRetriever.METADATA_KEY_BITRATE,
+        )
+        dao.files(bookId).map { file ->
+            val retriever = MediaMetadataRetriever()
+            val rows = buildList {
+                try {
+                    retriever.setDataSource(context, Uri.parse(file.uri))
+                    keys.forEach { (label, key) ->
+                        retriever.extractMetadata(key)?.takeIf { it.isNotBlank() }?.let { value ->
+                            add(TagRow(label, prettyTag(label, value)))
+                        }
+                    }
+                } catch (_: Exception) {
+                } finally {
+                    runCatching { retriever.release() }
+                }
+                add(TagRow("Length", formatHms(file.durationMs)))
+            }
+            FileTags(Uri.decode(file.uri).substringAfterLast('/'), rows)
+        }
+    }
+
+    private fun prettyTag(label: String, value: String): String = when (label) {
+        "Bitrate" -> value.toLongOrNull()?.let { "${it / 1000} kbps" } ?: value
+        else -> value.trim()
+    }
+
+    private fun formatHms(ms: Long): String {
+        val t = ms.coerceAtLeast(0) / 1000
+        return "%d:%02d:%02d".format(t / 3600, (t % 3600) / 60, t % 60)
+    }
     suspend fun chapter(id: Long) = dao.chapter(id)
 
     fun addBookmark(bookId: Long, positionMs: Long) {
@@ -256,3 +306,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }.getOrDefault(fallback)
     }
 }
+
+data class TagRow(val label: String, val value: String)
+data class FileTags(val name: String, val rows: List<TagRow>)
