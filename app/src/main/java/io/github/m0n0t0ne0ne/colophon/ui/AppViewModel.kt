@@ -52,12 +52,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Starts a sleep timer, applying the listener's chime and shake settings. */
     fun setSleep(durationMs: Long?) {
-        hub.setSleep(
-            durationMs,
-            chime = sleepChime.value,
-            shakeExtendMs = if (sleepShake.value) sleepShakeMin.value * 60_000L else 0L,
-        )
+        hub.setSleep(durationMs, chime = sleepChime.value, shakeExtendMs = shakeExtendMs())
     }
+
+    fun setSleepEndOfChapter() {
+        hub.setSleep(0L, chime = sleepChime.value, shakeExtendMs = shakeExtendMs(), endOfChapter = true)
+    }
+
+    private fun shakeExtendMs(): Long = if (sleepShake.value) sleepShakeMin.value * 60_000L else 0L
     val reviews: StateFlow<List<Long>> = dao.booksWithSuggestions().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val message = MutableStateFlow<String?>(null)

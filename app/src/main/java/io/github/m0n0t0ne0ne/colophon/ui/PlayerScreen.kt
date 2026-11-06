@@ -47,6 +47,7 @@ data class PlayerActions(
     val onSeekTo: (Long) -> Unit = {},
     val onSpeed: (Float) -> Unit = {},
     val onSleep: (Long?) -> Unit = {},
+    val onSleepChapter: () -> Unit = {},
     val onSettings: () -> Unit = {},
     val onBookmark: () -> Unit = {},
     val onMode: (BackgroundMode) -> Unit = {},
@@ -200,7 +201,7 @@ fun PlayerContent(
                     }
                 }
                 if (chapter != null && chapterEnd > position) {
-                    ChoiceChip("End of chapter", false, Modifier.fillMaxWidth()) { actions.onSleep(chapterEnd - position); sheet = null }
+                    ChoiceChip("End of chapter", false, Modifier.fillMaxWidth()) { actions.onSleepChapter(); sheet = null }
                 }
                 if (state.sleepLeftMs != null) SecondaryButton("Turn off", Modifier.fillMaxWidth()) { actions.onSleep(null); sheet = null }
             }

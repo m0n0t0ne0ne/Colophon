@@ -170,6 +170,7 @@ private fun PlayerRoute(vm: AppViewModel, nav: NavHostController, id: Long) {
             onSeekTo = vm.hub::seekTo,
             onSpeed = vm.hub::setSpeed,
             onSleep = { vm.setSleep(it) },
+            onSleepChapter = { vm.setSleepEndOfChapter() },
             onSettings = { nav.navigate("settings") },
             onBookmark = { vm.addBookmark(id, shown.positionMs) },
             onMode = vm::setBackground,

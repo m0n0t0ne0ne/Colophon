@@ -270,6 +270,7 @@ class PlayerHub(private val context: Context) {
     private var files: List<Long> = emptyList()
     private var sleepJob: Job? = null
     @Volatile private var sleepRemainingMs = 0L
+    @Volatile private var sleepEndOfChapter = false
     private var shake: ShakeDetector? = null
     /** Seconds to skip back when resuming after a long pause; set from settings. */
     @Volatile var longAwayRewindSec = 15
@@ -372,39 +373,76 @@ class PlayerHub(private val context: Context) {
         _state.value.bookId?.let { id -> scope.launch { dao.saveSpeed(id, speed) } }
     }
 
-    /** Starts (or clears) a sleep timer. Optionally chimes near the end and extends on a shake. */
-    fun setSleep(durationMs: Long?, chime: Boolean = false, shakeExtendMs: Long = 0L) {
+    /**
+     * Starts (or clears) a sleep timer.
+     * A duration timer only runs down while the book is playing. An end-of-chapter timer follows
+     * the current chapter, so skipping re-targets it and pausing the book holds it.
+     */
+    fun setSleep(durationMs: Long?, chime: Boolean = false, shakeExtendMs: Long = 0L, endOfChapter: Boolean = false) {
         sleepJob?.cancel()
         stopShake()
-        if (durationMs == null || durationMs <= 0) {
+        if (!endOfChapter && (durationMs == null || durationMs <= 0)) {
             sleepRemainingMs = 0
+            sleepEndOfChapter = false
             _state.value = _state.value.copy(sleepLeftMs = null)
             return
         }
-        sleepRemainingMs = durationMs
+        sleepEndOfChapter = endOfChapter
+        sleepRemainingMs = durationMs ?: 0
         if (shakeExtendMs > 0) startShake(shakeExtendMs)
         var chimed = false
         sleepJob = scope.launch {
-            while (sleepRemainingMs > 0) {
-                val left = sleepRemainingMs
-                _state.value = _state.value.copy(sleepLeftMs = left)
-                if (chime && !chimed && left <= 60_000) { chimed = true; playChime() }
-                if (left > 60_000) chimed = false
+            while (true) {
+                val playing = (RawPlayer.current ?: controller)?.isPlaying == true
+                val remaining = if (sleepEndOfChapter) (chapterRemainingMs() ?: Long.MAX_VALUE) else sleepRemainingMs
+                _state.value = _state.value.copy(sleepLeftMs = remaining.takeIf { it != Long.MAX_VALUE })
+                if (chime && !chimed && remaining in 1..60_000) { chimed = true; playChime() }
+                if (remaining > 60_000) chimed = false
+                if (remaining <= 0) break
                 delay(1000)
-                sleepRemainingMs -= 1000
+                if (!sleepEndOfChapter && playing) sleepRemainingMs -= 1000
             }
             controller?.pause()
             stopShake()
+            sleepEndOfChapter = false
             _state.value = _state.value.copy(sleepLeftMs = null)
         }
+    }
+
+    /** Time left in the current chapter, from the session's chapter-relative clock, or null if unknown. */
+    private fun chapterRemainingMs(): Long? {
+        val c = controller ?: return null
+        val duration = c.duration
+        if (duration == C.TIME_UNSET || duration <= 0) return null
+        return (duration - c.currentPosition).coerceAtLeast(0)
     }
 
     private fun startShake(extendMs: Long) {
         val manager = context.getSystemService(SensorManager::class.java) ?: return
         val sensor = manager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) ?: return
-        val detector = ShakeDetector { if (sleepRemainingMs > 0) sleepRemainingMs += extendMs }
+        val detector = ShakeDetector {
+            scope.launch {
+                when {
+                    sleepEndOfChapter -> {
+                        // Turn the end-of-chapter timer into a fixed one so it can run past the chapter.
+                        sleepRemainingMs = (chapterRemainingMs() ?: 0) + extendMs
+                        sleepEndOfChapter = false
+                        playShakeAck()
+                    }
+                    sleepRemainingMs > 0 -> { sleepRemainingMs += extendMs; playShakeAck() }
+                }
+            }
+        }
         shake = detector
         manager.registerListener(detector, sensor, SensorManager.SENSOR_DELAY_UI)
+    }
+
+    private fun playShakeAck() {
+        runCatching {
+            val tone = ToneGenerator(AudioManager.STREAM_MUSIC, 80)
+            tone.startTone(ToneGenerator.TONE_PROP_ACK, 300)
+            scope.launch { delay(600); runCatching { tone.release() } }
+        }
     }
 
     private fun stopShake() {

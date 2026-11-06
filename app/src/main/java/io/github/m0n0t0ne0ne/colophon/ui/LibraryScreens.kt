@@ -67,16 +67,18 @@ fun LibraryContent(
     Column(Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 20.dp)) {
         Spacer(Modifier.height(8.dp))
         HeaderRow(listOf("Library", "Books", "Series").getOrElse(tab) { "Library" }, null) {
-            IconBtn(Ic.Search, "Search library") { searching = !searching; if (!searching) query = "" }
-            IconBtn(Ic.Refresh, "Refresh library", if (importing) C.Muted else C.Text, onRefresh)
             Box {
-                IconBtn(Ic.Add, "Add audiobooks") { menu = true }
+                IconBtn(Ic.More, "Library options") { menu = true }
                 DropdownMenu(menu, { menu = false }) {
+                    DropdownMenuItem(text = { Text("Search") }, onClick = { menu = false; searching = !searching; if (!searching) query = "" })
+                    DropdownMenuItem(text = { Text("Refresh") }, onClick = { menu = false; onRefresh() })
                     DropdownMenuItem(text = { Text("Add a folder") }, onClick = { menu = false; onAddFolder() })
                     DropdownMenuItem(text = { Text("Add files") }, onClick = { menu = false; onAddFiles() })
                 }
             }
         }
+        Spacer(Modifier.height(4.dp))
+        HorizontalDivider(color = C.Line)
         if (searching) {
             OutlinedTextField(query, { query = it }, singleLine = true, placeholder = { Text("Title, author, or series") }, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))

@@ -1,5 +1,6 @@
-Replaces Jump back with a Settings screen and a smarter sleep timer.
+Ties the sleep timer to playback and tidies the library header.
 
-- The player's ⋮ menu now opens Settings instead of Jump back.
-- Sleep timer: a new End of chapter option, an optional chime at 1 minute left, and shake to extend by an amount you choose.
-- Resume: choose how far to skip back when you return after a long pause.
+- The sleep timer now only counts down while the book is playing, and pauses when you pause.
+- End of chapter follows the current chapter, so skipping re-targets it; the preset timers keep their time when you skip.
+- Shake to extend now plays a confirmation sound.
+- Library header is a little larger, its search, refresh and add actions moved into a ⋮ menu, and the divider now sits under the header instead of above the bottom bar.

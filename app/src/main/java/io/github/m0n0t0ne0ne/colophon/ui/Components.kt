@@ -77,7 +77,7 @@ fun ColophonTheme(content: @Composable () -> Unit) {
 }
 
 val TitleLarge = TextStyle(fontFamily = Serif, fontSize = 34.sp, lineHeight = 38.sp, color = C.Text)
-val HeaderTitle = TextStyle(fontFamily = Serif, fontSize = 40.sp, lineHeight = 44.sp, color = C.Text)
+val HeaderTitle = TextStyle(fontFamily = Serif, fontSize = 42.sp, lineHeight = 46.sp, color = C.Text)
 val TitleMedium = TextStyle(fontFamily = Serif, fontSize = 24.sp, lineHeight = 28.sp, color = C.Text)
 val BookTitle = TextStyle(fontFamily = Serif, fontSize = 19.sp, lineHeight = 23.sp, color = C.Text)
 val Body = TextStyle(fontFamily = Sans, fontSize = 15.sp, lineHeight = 20.sp, color = C.Text)
@@ -194,7 +194,6 @@ enum class Tab(val label: String) { Library("Library"), Books("Books"), Series("
 @Composable
 fun BottomBar(current: Tab?, onSelect: (Tab) -> Unit) {
     Column(Modifier.fillMaxWidth().background(C.Ground)) {
-        HorizontalDivider(color = C.Line)
         Row(Modifier.fillMaxWidth().navigationBarsPadding().height(64.dp)) {
             Tab.entries.forEach { tab ->
                 val active = tab == current
