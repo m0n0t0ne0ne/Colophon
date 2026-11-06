@@ -66,7 +66,7 @@ fun LibraryContent(
 
     Column(Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 20.dp)) {
         Spacer(Modifier.height(8.dp))
-        HeaderRow("Library", null) {
+        HeaderRow(listOf("Library", "Books", "Series").getOrElse(tab) { "Library" }, null) {
             IconBtn(Ic.Search, "Search library") { searching = !searching; if (!searching) query = "" }
             IconBtn(Ic.Refresh, "Refresh library", if (importing) C.Muted else C.Text, onRefresh)
             Box {
@@ -81,7 +81,6 @@ fun LibraryContent(
             OutlinedTextField(query, { query = it }, singleLine = true, placeholder = { Text("Title, author, or series") }, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
         }
-        UnderlineTabs(listOf("All", "Books", "Series"), tab) { tab = it }
         if (importing) LinearProgressIndicator(Modifier.fillMaxWidth().height(2.dp), color = C.Accent, trackColor = C.Line)
 
         if (books.isEmpty()) {
@@ -95,11 +94,11 @@ fun LibraryContent(
                 items(listening.take(5), span = { GridItemSpan(3) }) { ContinueRow(it, { onOpenBook(it) }, { onHideFromContinue(it) }, { onEditBook(it) }, { onRemoveBook(it) }) }
             }
             if (tab != 1 && groups.isNotEmpty()) {
-                header("Series")
+                if (tab == 0) header("Series")
                 items(groups, span = { GridItemSpan(3) }) { SeriesRow(it) { onOpenSeries(it.name) } }
             }
             if (tab != 2 && standalone.isNotEmpty()) {
-                header("Standalone books")
+                if (tab == 0) header("Standalone books")
                 items(standalone) { book ->
                     StandaloneTile(book, { onOpenBook(book) }, { onEditBook(book) }, { onRemoveBook(book) })
                 }

@@ -1,5 +1,4 @@
-Adds a Books tab to the bottom bar and reorders the library.
+Simplifies the library to follow the bottom bar.
 
-- The bottom bar is now Library, Books, Series, so you can jump straight to any view.
-- The library tabs follow the same order: All, Books, Series.
-- Removed the Add books button from the library, since the ⊕ at the top already adds books.
+- The top All / Books / Series tabs are gone; use the bottom bar to move between views.
+- The page header now names where you are: Library shows everything, Books shows your books, Series shows your series.
