@@ -81,7 +81,7 @@ fun LibraryContent(
             OutlinedTextField(query, { query = it }, singleLine = true, placeholder = { Text("Title, author, or series") }, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
         }
-        UnderlineTabs(listOf("All", "Series", "Books"), tab) { tab = it }
+        UnderlineTabs(listOf("All", "Books", "Series"), tab) { tab = it }
         if (importing) LinearProgressIndicator(Modifier.fillMaxWidth().height(2.dp), color = C.Accent, trackColor = C.Line)
 
         if (books.isEmpty()) {
@@ -94,31 +94,16 @@ fun LibraryContent(
                 header("Continue listening")
                 items(listening.take(5), span = { GridItemSpan(3) }) { ContinueRow(it, { onOpenBook(it) }, { onHideFromContinue(it) }, { onEditBook(it) }, { onRemoveBook(it) }) }
             }
-            if (tab != 2 && groups.isNotEmpty()) {
+            if (tab != 1 && groups.isNotEmpty()) {
                 header("Series")
                 items(groups, span = { GridItemSpan(3) }) { SeriesRow(it) { onOpenSeries(it.name) } }
             }
-            if (tab != 1 && standalone.isNotEmpty()) {
+            if (tab != 2 && standalone.isNotEmpty()) {
                 header("Standalone books")
                 items(standalone) { book ->
                     StandaloneTile(book, { onOpenBook(book) }, { onEditBook(book) }, { onRemoveBook(book) })
                 }
             }
-            item(span = { GridItemSpan(3) }) {
-                Box(Modifier.fillMaxWidth().padding(top = 20.dp)) { AddBooksButton(onAddFolder, onAddFiles) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AddBooksButton(onAddFolder: () -> Unit, onAddFiles: () -> Unit) {
-    var menu by remember { mutableStateOf(false) }
-    Box {
-        SecondaryButton("Add books", Modifier.fillMaxWidth()) { menu = true }
-        DropdownMenu(menu, { menu = false }) {
-            DropdownMenuItem(text = { Text("Add a folder") }, onClick = { menu = false; onAddFolder() })
-            DropdownMenuItem(text = { Text("Add files") }, onClick = { menu = false; onAddFiles() })
         }
     }
 }

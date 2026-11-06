@@ -111,6 +111,7 @@ object Ic {
     val Chapters = line("chapters", "M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01")
     val Moon = line("moon", "M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z")
     val Bookmark = line("bookmark", "M6 3h12v18l-6-4-6 4z")
+    val Book = line("book", "M12 7c-2.2-1.4-5.3-1.4-7.5 0v11c2.2-1.4 5.3-1.4 7.5 0M12 7c2.2-1.4 5.3-1.4 7.5 0v11c-2.2-1.4-5.3-1.4-7.5 0M12 7v11")
     val Picture = line("picture", "M4.5 4h15A1.5 1.5 0 0 1 21 5.5v13a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5v-13A1.5 1.5 0 0 1 4.5 4zM3 16l5-5 4 4 3-3 6 6")
     val Edit = line("edit", "M4 20h4L19 9l-4-4L4 16z")
     val Undo = line("undo", "M9 7L4 12l5 5M4 12h10a6 6 0 0 1 6 6")
@@ -183,7 +184,7 @@ fun HeaderRow(title: String, onBack: (() -> Unit)?, actions: @Composable RowScop
     }
 }
 
-enum class Tab(val label: String) { Library("Library"), Series("Series"), Playing("Playing"), Analyzer("Analyzer") }
+enum class Tab(val label: String) { Library("Library"), Books("Books"), Series("Series"), Playing("Playing"), Analyzer("Analyzer") }
 
 @Composable
 fun BottomBar(current: Tab?, onSelect: (Tab) -> Unit) {
@@ -198,7 +199,7 @@ fun BottomBar(current: Tab?, onSelect: (Tab) -> Unit) {
                     horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
                 ) {
                     Icon(
-                        when (tab) { Tab.Library -> Ic.Library; Tab.Series -> Ic.Series; Tab.Playing -> Ic.Play; Tab.Analyzer -> Ic.Wave },
+                        when (tab) { Tab.Library -> Ic.Library; Tab.Books -> Ic.Book; Tab.Series -> Ic.Series; Tab.Playing -> Ic.Play; Tab.Analyzer -> Ic.Wave },
                         contentDescription = null, tint = tint, modifier = Modifier.size(21.dp),
                     )
                     Spacer(Modifier.height(3.dp))

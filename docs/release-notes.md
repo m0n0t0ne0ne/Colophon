@@ -1,4 +1,5 @@
-Adds an Add books button and a file tag viewer.
+Adds a Books tab to the bottom bar and reorders the library.
 
-- An Add books button now sits at the bottom of the library, alongside the ⊕ menu.
-- Book details has a View file tags screen showing all the metadata read from each audio file.
+- The bottom bar is now Library, Books, Series, so you can jump straight to any view.
+- The library tabs follow the same order: All, Books, Series.
+- Removed the Add books button from the library, since the ⊕ at the top already adds books.

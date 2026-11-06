@@ -52,6 +52,7 @@ fun ColophonApp(vm: AppViewModel) {
     val current = when {
         route == "library" -> Tab.Library
         route == "seriesList" || route?.startsWith("series/") == true -> Tab.Series
+        route == "booksList" -> Tab.Books
         route == "analyzer" -> Tab.Analyzer
         else -> null
     }
@@ -63,6 +64,7 @@ fun ColophonApp(vm: AppViewModel) {
             if (current != null) BottomBar(current) { tab ->
                 when (tab) {
                     Tab.Library -> nav.go("library")
+                    Tab.Books -> nav.go("booksList")
                     Tab.Series -> nav.go("seriesList")
                     Tab.Analyzer -> nav.go("analyzer")
                     Tab.Playing -> {
@@ -82,7 +84,8 @@ fun ColophonApp(vm: AppViewModel) {
         Box(Modifier.fillMaxSize().background(C.Ground).padding(bottom = if (fullBleed) 0.dp else padding.calculateBottomPadding())) {
             NavHost(nav, "library") {
                 composable("library") { LibraryRoute(vm, nav, 0) }
-                composable("seriesList") { LibraryRoute(vm, nav, 1) }
+                composable("booksList") { LibraryRoute(vm, nav, 1) }
+                composable("seriesList") { LibraryRoute(vm, nav, 2) }
                 composable("series/{name}", listOf(navArgument("name") { type = NavType.StringType })) { e ->
                     val name = Uri.decode(e.arguments?.getString("name").orEmpty())
                     SeriesContent(
