@@ -28,6 +28,7 @@ import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import io.github.m0n0t0ne0ne.colophon.MainActivity
 import io.github.m0n0t0ne0ne.colophon.R
+import io.github.m0n0t0ne0ne.colophon.core.JumpHistory
 import io.github.m0n0t0ne0ne.colophon.core.Resume
 import io.github.m0n0t0ne0ne.colophon.core.SectionMap
 import io.github.m0n0t0ne0ne.colophon.core.Timeline
@@ -147,8 +148,9 @@ class PlaybackService : MediaSessionService() {
                     if (files.isEmpty()) return@launch
                     val from = Timeline.global(files, before.second, old.positionMs)
                     val to = Timeline.global(files, after.second, new.positionMs)
-                    if (abs(from - to) >= JUMP_WORTH_REMEMBERING_MS) {
-                        val dao = ColophonDatabase.get(this@PlaybackService).dao()
+                    val dao = ColophonDatabase.get(this@PlaybackService).dao()
+                    val last = dao.lastHistory(before.first)?.positionMs
+                    if (JumpHistory.shouldRemember(from, to, files.sum(), last)) {
                         dao.insertHistory(PositionHistory(bookId = before.first, positionMs = from, at = System.currentTimeMillis()))
                         dao.trimHistory(before.first)
                     }

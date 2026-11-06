@@ -159,3 +159,20 @@ class CoreTest {
         assertTrue(Resume.rewindMs(10_000) < Resume.rewindMs(100_000_000))
     }
 }
+
+class JumpHistoryTest {
+    @org.junit.Test fun keepsRealJumpsAndDropsJunk() {
+        val total = 9_200_000L
+        // A genuine jump of more than a minute from a mid-book spot is remembered.
+        assertTrue(JumpHistory.shouldRemember(fromMs = 2_300_000, toMs = 100_000, totalMs = total, lastMs = null))
+        // Tiny moves are not jumps.
+        assertFalse(JumpHistory.shouldRemember(fromMs = 2_300_000, toMs = 2_280_000, totalMs = total, lastMs = null))
+        // The spurious 0:00:00 and end-of-book entries are dropped.
+        assertFalse(JumpHistory.shouldRemember(fromMs = 0, toMs = 2_000_000, totalMs = total, lastMs = null))
+        assertFalse(JumpHistory.shouldRemember(fromMs = total, toMs = 1_000_000, totalMs = total, lastMs = null))
+        // A repeat of the last remembered spot is not stacked.
+        assertFalse(JumpHistory.shouldRemember(fromMs = 2_301_000, toMs = 100_000, totalMs = total, lastMs = 2_300_000))
+        // Unknown duration still allows a real jump.
+        assertTrue(JumpHistory.shouldRemember(fromMs = 500_000, toMs = 100_000, totalMs = 0, lastMs = null))
+    }
+}

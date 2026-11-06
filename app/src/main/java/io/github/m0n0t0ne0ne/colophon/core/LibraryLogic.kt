@@ -1,5 +1,25 @@
 package io.github.m0n0t0ne0ne.colophon.core
 
+import kotlin.math.abs
+
+/** Decides which places are worth saving as a jump-back point, so the undo list stays meaningful. */
+object JumpHistory {
+    const val MIN_JUMP_MS = 60_000L
+    private const val EDGE_MS = 2_000L
+    private const val DEDUPE_MS = 5_000L
+
+    fun shouldRemember(fromMs: Long, toMs: Long, totalMs: Long, lastMs: Long?): Boolean {
+        if (abs(fromMs - toMs) < MIN_JUMP_MS) return false
+        // The very start and the very end aren't useful places to return to, and are where
+        // spurious entries land, so drop them.
+        if (fromMs <= EDGE_MS) return false
+        if (totalMs > 0 && fromMs >= totalMs - EDGE_MS) return false
+        // Don't stack near-identical entries from one navigation.
+        if (lastMs != null && abs(lastMs - fromMs) < DEDUPE_MS) return false
+        return true
+    }
+}
+
 /** Sorts "Track 2" before "Track 10", which plain alphabetical sorting gets wrong. */
 object NaturalOrder : Comparator<String> {
     private val parts = Regex("""\d+|\D+""")

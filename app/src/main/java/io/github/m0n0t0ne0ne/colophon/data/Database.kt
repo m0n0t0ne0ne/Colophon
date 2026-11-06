@@ -114,6 +114,13 @@ interface LibraryDao {
     @Query("DELETE FROM Bookmark WHERE id = :id") suspend fun deleteBookmark(id: Long)
 
     @Insert suspend fun insertHistory(entry: PositionHistory)
+    @Query("SELECT * FROM PositionHistory WHERE bookId = :id ORDER BY at DESC LIMIT 1") suspend fun lastHistory(id: Long): PositionHistory?
+    @Query(
+        """DELETE FROM PositionHistory WHERE positionMs <= 2000
+           OR ((SELECT durationMs FROM Book WHERE Book.id = PositionHistory.bookId) > 0
+               AND positionMs >= (SELECT durationMs FROM Book WHERE Book.id = PositionHistory.bookId) - 2000)"""
+    )
+    suspend fun pruneTrivialHistory()
     @Query("SELECT * FROM PositionHistory WHERE bookId = :id ORDER BY at DESC LIMIT 10")
     fun history(id: Long): Flow<List<PositionHistory>>
     @Query("DELETE FROM PositionHistory WHERE bookId = :id AND id NOT IN (SELECT id FROM PositionHistory WHERE bookId = :id ORDER BY at DESC LIMIT 10)")

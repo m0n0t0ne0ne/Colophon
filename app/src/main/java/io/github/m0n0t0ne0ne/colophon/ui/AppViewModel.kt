@@ -32,6 +32,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val hub = (app as ColophonApplication).hub
 
     val books: StateFlow<List<Book>> = dao.books().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    init {
+        // One-time cleanup of jump-back entries left at the very start or end of a book.
+        viewModelScope.launch { dao.pruneTrivialHistory() }
+    }
     val reviews: StateFlow<List<Long>> = dao.booksWithSuggestions().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val message = MutableStateFlow<String?>(null)

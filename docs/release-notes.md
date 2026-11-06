@@ -1,3 +1,5 @@
-Makes the player blend into the bottom of the screen.
+Fixes the Jump back list so it only shows real places you left.
 
-- The player's artwork background now runs all the way behind the phone's gesture bar, so there's no dark strip breaking it apart.
+- Jump back no longer fills up with 0:00:00 or end-of-book entries.
+- Only a genuine jump of a minute or more is saved, and repeats are skipped.
+- Existing stray entries are cleared automatically.
