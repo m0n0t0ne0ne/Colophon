@@ -86,6 +86,8 @@ fun ColophonApp(vm: AppViewModel) {
                         name, books.filter { it.series == name }, { nav.popBackStack() },
                         { b -> vm.play(b.id); nav.navigate("player/${b.id}") },
                         { b -> nav.navigate("details/${b.id}") },
+                        { b -> vm.removeBook(b.id) },
+                        { vm.removeSeries(name); nav.popBackStack() },
                     )
                 }
                 composable("player/{id}", listOf(idArg())) { e -> PlayerRoute(vm, nav, e.id()) }
@@ -131,6 +133,7 @@ private fun LibraryRoute(vm: AppViewModel, nav: NavHostController, tab: Int) {
         vm::refreshLibrary,
         vm::hideFromContinue,
         { b -> nav.navigate("details/${b.id}") },
+        { b -> vm.removeBook(b.id) },
     )
 }
 

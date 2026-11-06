@@ -202,11 +202,13 @@ class Importer(private val context: Context, private val dao: LibraryDao, privat
     }
 
     private suspend fun deleteBook(id: Long) {
+        val cover = dao.book(id)?.coverPath
         dao.deleteChapters(id)
         dao.deleteBookmarks(id)
         dao.deleteHistory(id)
         dao.deleteFiles(id)
         dao.deleteBook(id)
+        cover?.let { runCatching { File(it).delete() } }
     }
 
     private suspend fun consolidate() {

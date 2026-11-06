@@ -213,19 +213,29 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { done(withContext(Dispatchers.IO) { Covers.copy(context, uri, bookId) }) }
     }
 
-    fun removeBook(bookId: Long) {
+    fun removeBook(bookId: Long) { viewModelScope.launch { removeBookNow(bookId) } }
+
+    /** Removes every book in a series, the app's stand-in for removing an imported folder. */
+    fun removeSeries(name: String) {
         viewModelScope.launch {
-            hub.forget(bookId)
-            cancelAnalysis(bookId)
-            // Remembered so a refresh doesn't bring back a book you removed on purpose.
-            val keys = dao.files(bookId).map { Importer.fileKey(it.uri) }
-            prefs.edit().putStringSet("removedFiles", removedFiles() + keys).apply()
-            dao.deleteChapters(bookId)
-            dao.deleteBookmarks(bookId)
-            dao.deleteHistory(bookId)
-            dao.deleteFiles(bookId)
-            dao.deleteBook(bookId)
+            dao.booksInSeries(name).forEach { removeBookNow(it.id) }
+            message.value = "Removed \u201C$name\u201D. Your audio files are untouched."
         }
+    }
+
+    private suspend fun removeBookNow(bookId: Long) {
+        hub.forget(bookId)
+        cancelAnalysis(bookId)
+        val cover = dao.book(bookId)?.coverPath
+        // Remembered so a refresh doesn't bring back a book you removed on purpose.
+        val keys = dao.files(bookId).map { Importer.fileKey(it.uri) }
+        prefs.edit().putStringSet("removedFiles", removedFiles() + keys).apply()
+        dao.deleteChapters(bookId)
+        dao.deleteBookmarks(bookId)
+        dao.deleteHistory(bookId)
+        dao.deleteFiles(bookId)
+        dao.deleteBook(bookId)
+        cover?.let { runCatching { java.io.File(it).delete() } }
     }
 
     suspend fun artColors(path: String?): ArtColors = withContext(Dispatchers.Default) {

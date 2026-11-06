@@ -50,6 +50,7 @@ fun LibraryContent(
     onRefresh: () -> Unit = {},
     onHideFromContinue: (Book) -> Unit = {},
     onEditBook: (Book) -> Unit = {},
+    onRemoveBook: (Book) -> Unit = {},
 ) {
     var tab by rememberSaveable(initialTab) { mutableIntStateOf(initialTab) }
     var query by rememberSaveable { mutableStateOf("") }
@@ -91,7 +92,7 @@ fun LibraryContent(
         LazyVerticalGrid(GridCells.Fixed(3), Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(vertical = 16.dp)) {
             if (tab == 0 && listening.isNotEmpty()) {
                 header("Continue listening")
-                items(listening.take(5), span = { GridItemSpan(3) }) { ContinueRow(it, { onOpenBook(it) }, { onHideFromContinue(it) }, { onEditBook(it) }) }
+                items(listening.take(5), span = { GridItemSpan(3) }) { ContinueRow(it, { onOpenBook(it) }, { onHideFromContinue(it) }, { onEditBook(it) }, { onRemoveBook(it) }) }
             }
             if (tab != 2 && groups.isNotEmpty()) {
                 header("Series")
@@ -100,11 +101,7 @@ fun LibraryContent(
             if (tab != 1 && standalone.isNotEmpty()) {
                 header("Standalone books")
                 items(standalone) { book ->
-                    Column(Modifier.clickable { onOpenBook(book) }) {
-                        BoxWithConstraints { Cover(book, maxWidth) }
-                        Spacer(Modifier.height(6.dp))
-                        Text(book.author.ifBlank { book.title }, style = Tiny, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
+                    StandaloneTile(book, { onOpenBook(book) }, { onEditBook(book) }, { onRemoveBook(book) })
                 }
             }
         }
@@ -128,8 +125,9 @@ private fun EmptyLibrary(onAddFolder: () -> Unit, onAddFiles: () -> Unit) {
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun ContinueRow(book: Book, onClick: () -> Unit, onHide: () -> Unit, onEdit: () -> Unit) {
+private fun ContinueRow(book: Book, onClick: () -> Unit, onHide: () -> Unit, onEdit: () -> Unit, onRemove: () -> Unit) {
     var menu by remember { mutableStateOf(false) }
+    var confirm by remember { mutableStateOf(false) }
     Row(
         Modifier.fillMaxWidth().combinedClickable(onClick = onClick, onLongClick = { menu = true }, onLongClickLabel = "Book options").padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically,
@@ -137,6 +135,7 @@ private fun ContinueRow(book: Book, onClick: () -> Unit, onHide: () -> Unit, onE
         DropdownMenu(menu, { menu = false }) {
             DropdownMenuItem(text = { Text("Remove from Continue listening") }, onClick = { menu = false; onHide() })
             DropdownMenuItem(text = { Text("Book details") }, onClick = { menu = false; onEdit() })
+            DropdownMenuItem(text = { Text("Remove from library", color = C.Warn) }, onClick = { menu = false; confirm = true })
         }
         Cover(book, 88.dp)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -148,6 +147,37 @@ private fun ContinueRow(book: Book, onClick: () -> Unit, onHide: () -> Unit, onE
             Text("${(f * 100).toInt()}% · ${formatLeft(book.durationMs - book.positionMs)} left", style = Tiny)
         }
     }
+    if (confirm) RemoveBookDialog(book.title, { confirm = false }, { confirm = false; onRemove() })
+}
+
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+private fun StandaloneTile(book: Book, onOpen: () -> Unit, onDetails: () -> Unit, onRemove: () -> Unit) {
+    var menu by remember { mutableStateOf(false) }
+    var confirm by remember { mutableStateOf(false) }
+    Box {
+        Column(Modifier.combinedClickable(onClick = onOpen, onLongClick = { menu = true }, onLongClickLabel = "Book options")) {
+            BoxWithConstraints { Cover(book, maxWidth) }
+            Spacer(Modifier.height(6.dp))
+            Text(book.author.ifBlank { book.title }, style = Tiny, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        DropdownMenu(menu, { menu = false }) {
+            DropdownMenuItem(text = { Text("Book details") }, onClick = { menu = false; onDetails() })
+            DropdownMenuItem(text = { Text("Remove from library", color = C.Warn) }, onClick = { menu = false; confirm = true })
+        }
+    }
+    if (confirm) RemoveBookDialog(book.title, { confirm = false }, { confirm = false; onRemove() })
+}
+
+@Composable
+private fun RemoveBookDialog(title: String, onDismiss: () -> Unit, onConfirm: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Remove this book?") },
+        text = { Text("\u201C$title\u201D will be removed from your library. The audio file stays on your phone.") },
+        confirmButton = { TextButton(onClick = onConfirm) { Text("Remove", color = C.Warn) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Keep") } },
+    )
 }
 
 @Composable
@@ -180,8 +210,12 @@ fun SeriesContent(
     onBack: () -> Unit,
     onOpenBook: (Book) -> Unit,
     onEdit: (Book) -> Unit,
+    onRemoveBook: (Book) -> Unit = {},
+    onRemoveSeries: () -> Unit = {},
 ) {
     var mode by rememberSaveable { mutableIntStateOf(0) }
+    var seriesMenu by remember { mutableStateOf(false) }
+    var confirmSeries by remember { mutableStateOf(false) }
     val author = books.firstOrNull { it.author.isNotBlank() }?.author
     val ordered = if (mode == 0) {
         books.sortedWith(compareBy<Book> { it.year ?: Int.MAX_VALUE }.thenBy { it.seriesNumber ?: Double.MAX_VALUE }.thenBy { it.title })
@@ -189,33 +223,66 @@ fun SeriesContent(
         books.sortedWith(compareBy<Book> { it.seriesNumber ?: Double.MAX_VALUE }.thenBy { it.title })
     }
     Column(Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 20.dp)) {
-        HeaderRow("", onBack)
+        HeaderRow("", onBack) {
+            Box {
+                IconBtn(Ic.More, "Series options") { seriesMenu = true }
+                DropdownMenu(seriesMenu, { seriesMenu = false }) {
+                    DropdownMenuItem(text = { Text("Remove entire series", color = C.Warn) }, onClick = { seriesMenu = false; confirmSeries = true })
+                }
+            }
+        }
         Text(name, style = TitleLarge)
         Text(listOfNotNull(author, "${books.size} books").joinToString(" · "), style = Small, modifier = Modifier.padding(top = 4.dp, bottom = 6.dp))
         UnderlineTabs(listOf("Publication order", "Series order"), mode) { mode = it }
         LazyColumn(Modifier.fillMaxSize()) {
             items(ordered, key = { it.id }) { book ->
-                Row(Modifier.fillMaxWidth().clickable { onOpenBook(book) }.padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Cover(book, 56.dp, numberOnly = true)
-                    Column(Modifier.weight(1f)) {
-                        Text(book.title, style = BookTitle.copy(fontSize = 18.sp), maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        val meta = listOfNotNull(
-                            book.seriesNumber?.let { if (it == 0.0) "Prequel" else "Book ${if (it % 1.0 == 0.0) it.toInt().toString() else it.toString()}" },
-                            book.year?.toString(),
-                        ).joinToString(" · ")
-                        if (meta.isNotEmpty()) Text(meta, style = Small)
-                    }
-                    val percent = if (book.durationMs > 0) (book.positionMs * 100 / book.durationMs).toInt() else 0
-                    when {
-                        book.finished -> Text("Finished", style = Tiny)
-                        book.positionMs > 0 -> Text("$percent%", style = Tiny.copy(color = C.Accent))
-                    }
-                    IconBtn(Ic.Edit, "Edit ${book.title}", tint = C.Muted) { onEdit(book) }
-                }
+                SeriesBookRow(book, { onOpenBook(book) }, { onEdit(book) }, { onRemoveBook(book) })
                 HorizontalDivider(color = Color0)
             }
         }
     }
+    if (confirmSeries) {
+        AlertDialog(
+            onDismissRequest = { confirmSeries = false },
+            title = { Text("Remove this series?") },
+            text = { Text("All ${books.size} books in \u201C$name\u201D will be removed from your library. Your audio files stay on your phone.") },
+            confirmButton = { TextButton(onClick = { confirmSeries = false; onRemoveSeries() }) { Text("Remove", color = C.Warn) } },
+            dismissButton = { TextButton(onClick = { confirmSeries = false }) { Text("Keep") } },
+        )
+    }
+}
+
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+private fun SeriesBookRow(book: Book, onOpen: () -> Unit, onEdit: () -> Unit, onRemove: () -> Unit) {
+    var menu by remember { mutableStateOf(false) }
+    var confirm by remember { mutableStateOf(false) }
+    Box {
+        Row(
+            Modifier.fillMaxWidth().combinedClickable(onClick = onOpen, onLongClick = { menu = true }, onLongClickLabel = "Book options").padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Cover(book, 56.dp, numberOnly = true)
+            Column(Modifier.weight(1f)) {
+                Text(book.title, style = BookTitle.copy(fontSize = 18.sp), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                val meta = listOfNotNull(
+                    book.seriesNumber?.let { if (it == 0.0) "Prequel" else "Book ${if (it % 1.0 == 0.0) it.toInt().toString() else it.toString()}" },
+                    book.year?.toString(),
+                ).joinToString(" · ")
+                if (meta.isNotEmpty()) Text(meta, style = Small)
+            }
+            val percent = if (book.durationMs > 0) (book.positionMs * 100 / book.durationMs).toInt() else 0
+            when {
+                book.finished -> Text("Finished", style = Tiny)
+                book.positionMs > 0 -> Text("$percent%", style = Tiny.copy(color = C.Accent))
+            }
+            IconBtn(Ic.Edit, "Edit ${book.title}", tint = C.Muted) { onEdit() }
+        }
+        DropdownMenu(menu, { menu = false }) {
+            DropdownMenuItem(text = { Text("Remove from library", color = C.Warn) }, onClick = { menu = false; confirm = true })
+        }
+    }
+    if (confirm) RemoveBookDialog(book.title, { confirm = false }, { confirm = false; onRemove() })
 }
 
 private val Color0 = androidx.compose.ui.graphics.Color(0xFF1C1F22)
