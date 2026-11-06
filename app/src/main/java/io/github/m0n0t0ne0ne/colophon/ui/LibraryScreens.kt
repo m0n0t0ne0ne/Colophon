@@ -88,7 +88,11 @@ fun LibraryContent(
             return@Column
         }
 
-        LazyVerticalGrid(GridCells.Fixed(3), Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(vertical = 16.dp)) {
+        LazyVerticalGrid(
+            GridCells.Fixed(3), Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp),
+            contentPadding = PaddingValues(top = if (tab == 0) 16.dp else 32.dp, bottom = 16.dp),
+        ) {
             if (tab == 0 && listening.isNotEmpty()) {
                 header("Continue listening")
                 items(listening.take(5), span = { GridItemSpan(3) }) { ContinueRow(it, { onOpenBook(it) }, { onHideFromContinue(it) }, { onEditBook(it) }, { onRemoveBook(it) }) }
@@ -158,7 +162,7 @@ private fun StandaloneTile(book: Book, onOpen: () -> Unit, onDetails: () -> Unit
         Column(Modifier.combinedClickable(onClick = onOpen, onLongClick = { menu = true }, onLongClickLabel = "Book options")) {
             BoxWithConstraints { Cover(book, maxWidth) }
             Spacer(Modifier.height(6.dp))
-            Text(book.title, style = BookTitle.copy(fontSize = 14.sp, lineHeight = 18.sp), maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(book.title, style = Tiny, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
         DropdownMenu(menu, { menu = false }) {
             DropdownMenuItem(text = { Text("Book details") }, onClick = { menu = false; onDetails() })

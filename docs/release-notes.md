@@ -1,4 +1,4 @@
-Shows book titles in the library and enlarges the page header.
+Refines the library's book labels and spacing.
 
-- Books now show their title under the cover instead of the author.
-- The top-level header (Library, Books, Series, Analyzer) is larger and sits with the search, refresh and add buttons.
+- Book titles under covers use the lighter label style again, not bold.
+- The Books and Series pages now have more room between the header and the first row.
