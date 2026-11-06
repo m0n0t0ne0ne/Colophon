@@ -1,5 +1,3 @@
-Lets you remove books and whole series from your library.
+Makes the player blend into the bottom of the screen.
 
-- Long press any book in the library or a series to remove it.
-- Remove an entire series from its ⋮ menu, the quickest way to clear a folder you imported.
-- Removing a book deletes only Colophon's record of it. Your audio files are never touched.
+- The player's artwork background now runs all the way behind the phone's gesture bar, so there's no dark strip breaking it apart.

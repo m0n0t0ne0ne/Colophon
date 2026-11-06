@@ -76,7 +76,10 @@ fun ColophonApp(vm: AppViewModel) {
             }
         },
     ) { padding ->
-        Box(Modifier.fillMaxSize().background(C.Ground).padding(bottom = padding.calculateBottomPadding())) {
+        // The player paints its backdrop edge to edge, including behind the gesture bar, so
+        // it doesn't break into a separate strip. Its own controls keep a safe-area inset.
+        val fullBleed = route?.startsWith("player/") == true
+        Box(Modifier.fillMaxSize().background(C.Ground).padding(bottom = if (fullBleed) 0.dp else padding.calculateBottomPadding())) {
             NavHost(nav, "library") {
                 composable("library") { LibraryRoute(vm, nav, 0) }
                 composable("seriesList") { LibraryRoute(vm, nav, 1) }
