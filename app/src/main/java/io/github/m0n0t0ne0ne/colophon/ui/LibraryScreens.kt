@@ -158,7 +158,7 @@ private fun StandaloneTile(book: Book, onOpen: () -> Unit, onDetails: () -> Unit
         Column(Modifier.combinedClickable(onClick = onOpen, onLongClick = { menu = true }, onLongClickLabel = "Book options")) {
             BoxWithConstraints { Cover(book, maxWidth) }
             Spacer(Modifier.height(6.dp))
-            Text(book.author.ifBlank { book.title }, style = Tiny, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(book.title, style = BookTitle.copy(fontSize = 14.sp, lineHeight = 18.sp), maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
         DropdownMenu(menu, { menu = false }) {
             DropdownMenuItem(text = { Text("Book details") }, onClick = { menu = false; onDetails() })

@@ -77,6 +77,7 @@ fun ColophonTheme(content: @Composable () -> Unit) {
 }
 
 val TitleLarge = TextStyle(fontFamily = Serif, fontSize = 34.sp, lineHeight = 38.sp, color = C.Text)
+val HeaderTitle = TextStyle(fontFamily = Serif, fontSize = 40.sp, lineHeight = 44.sp, color = C.Text)
 val TitleMedium = TextStyle(fontFamily = Serif, fontSize = 24.sp, lineHeight = 28.sp, color = C.Text)
 val BookTitle = TextStyle(fontFamily = Serif, fontSize = 19.sp, lineHeight = 23.sp, color = C.Text)
 val Body = TextStyle(fontFamily = Sans, fontSize = 15.sp, lineHeight = 20.sp, color = C.Text)
@@ -173,14 +174,18 @@ fun UnderlineTabs(items: List<String>, selected: Int, onSelect: (Int) -> Unit) {
 
 @Composable
 fun HeaderRow(title: String, onBack: (() -> Unit)?, actions: @Composable RowScope.() -> Unit = {}) {
-    Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        Modifier.fillMaxWidth().height(if (onBack != null) 56.dp else 76.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         if (onBack != null) {
             Box(Modifier.offset(x = (-12).dp)) { IconBtn(Ic.Back, "Back", onClick = onBack) }
             Text(title, style = TitleMedium, modifier = Modifier.weight(1f).offset(x = (-8).dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
         } else {
-            Text(title, style = TitleLarge, modifier = Modifier.weight(1f))
+            Text(title, style = HeaderTitle, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        actions()
+        // The action icons sit a touch higher than centre so they align with the large title's cap height.
+        Row(verticalAlignment = Alignment.CenterVertically) { actions() }
     }
 }
 

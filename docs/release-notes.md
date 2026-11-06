@@ -1,4 +1,4 @@
-Simplifies the library to follow the bottom bar.
+Shows book titles in the library and enlarges the page header.
 
-- The top All / Books / Series tabs are gone; use the bottom bar to move between views.
-- The page header now names where you are: Library shows everything, Books shows your books, Series shows your series.
+- Books now show their title under the cover instead of the author.
+- The top-level header (Library, Books, Series, Analyzer) is larger and sits with the search, refresh and add buttons.
