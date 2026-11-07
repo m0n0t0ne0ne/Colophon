@@ -1,3 +1,3 @@
-Fixes the skip-back after a long pause.
+Fixes the pause/play rewind loop.
 
-- Resuming a book now skips back by your chosen amount after you've been away, even when the book was still loaded. Before, it only applied on a fresh start.
+- Pausing and resuming now skips back once by a few seconds, instead of rewinding over and over and refusing to play.

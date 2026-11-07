@@ -130,13 +130,6 @@ class PlaybackService : MediaSessionService() {
         val chapterPlayer = ChapterPlayer(player)
         player.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
-                if (!isPlaying) {
-                    pausedAt = System.currentTimeMillis()
-                } else if (pausedAt > 0L) {
-                    val awayMs = System.currentTimeMillis() - pausedAt
-                    pausedAt = 0L
-                    scope.launch { rewindForResume(player, awayMs) }
-                }
                 scope.launch { save(player) }
                 saver?.cancel()
                 if (isPlaying) saver = scope.launch {
@@ -144,6 +137,18 @@ class PlaybackService : MediaSessionService() {
                         delay(SAVE_INTERVAL_MS)
                         save(player)
                     }
+                }
+            }
+
+            // Uses the play/pause intent, which (unlike isPlaying) doesn't flip during buffering
+            // or seeking, so the resume rewind fires once and can't re-trigger itself.
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                if (!playWhenReady) {
+                    pausedAt = System.currentTimeMillis()
+                } else if (pausedAt > 0L) {
+                    val awayMs = System.currentTimeMillis() - pausedAt
+                    pausedAt = 0L
+                    scope.launch { rewindForResume(player, awayMs) }
                 }
             }
 
