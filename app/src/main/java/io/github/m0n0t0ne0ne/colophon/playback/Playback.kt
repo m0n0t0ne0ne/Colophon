@@ -71,6 +71,8 @@ class PlaybackService : MediaSessionService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val durations = HashMap<Long, List<Long>>()
     private var saver: Job? = null
+    @Volatile private var pausedAt = 0L
+    @Volatile private var currentBook: Long? = null
     private var sections: Job? = null
     private var raw: Player? = null
     private var sectionsBook: Long? = null
@@ -128,6 +130,13 @@ class PlaybackService : MediaSessionService() {
         val chapterPlayer = ChapterPlayer(player)
         player.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
+                if (!isPlaying) {
+                    pausedAt = System.currentTimeMillis()
+                } else if (pausedAt > 0L) {
+                    val awayMs = System.currentTimeMillis() - pausedAt
+                    pausedAt = 0L
+                    scope.launch { rewindForResume(player, awayMs) }
+                }
                 scope.launch { save(player) }
                 saver?.cancel()
                 if (isPlaying) saver = scope.launch {
@@ -139,7 +148,10 @@ class PlaybackService : MediaSessionService() {
             }
 
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                watchSections(chapterPlayer, parseId(mediaItem?.mediaId)?.first)
+                val book = parseId(mediaItem?.mediaId)?.first
+                // A different book shouldn't inherit a pause from the last one.
+                if (book != currentBook) { currentBook = book; pausedAt = 0L }
+                watchSections(chapterPlayer, book)
             }
 
             override fun onPositionDiscontinuity(old: Player.PositionInfo, new: Player.PositionInfo, reason: Int) {
@@ -213,6 +225,19 @@ class PlaybackService : MediaSessionService() {
                 )
             }
         }
+    }
+
+    /** On resuming after a pause, skip back by the amount the away time calls for. */
+    private suspend fun rewindForResume(player: Player, awayMs: Long) {
+        val (bookId, index) = parseId(player.currentMediaItem?.mediaId) ?: return
+        val sec = getSharedPreferences("settings", Context.MODE_PRIVATE).getInt("resumeRewindSec", 15)
+        val rewind = Resume.rewindMs(awayMs, sec)
+        if (rewind <= 0L) return
+        val files = durationsFor(bookId)
+        if (files.isEmpty()) return
+        val target = (Timeline.global(files, index, player.currentPosition) - rewind).coerceAtLeast(0)
+        val (i, offset) = Timeline.locate(files, target)
+        player.seekTo(i, offset)
     }
 
     private suspend fun durationsFor(bookId: Long): List<Long> =

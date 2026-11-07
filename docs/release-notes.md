@@ -1,5 +1,3 @@
-Adds notification sound choices and highlights the active sleep timer.
+Fixes the skip-back after a long pause.
 
-- Settings now lets you pick the notification sound, set its volume, and preview it.
-- The sound is used for both the 1-minute chime and the shake confirmation.
-- When a sleep timer is running, its option is highlighted in the sleep menu.
+- Resuming a book now skips back by your chosen amount after you've been away, even when the book was still loaded. Before, it only applied on a fresh start.
