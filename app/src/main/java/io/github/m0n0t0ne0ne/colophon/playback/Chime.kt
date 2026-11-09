@@ -22,19 +22,21 @@ private data class Tone(val freq: Float, val atSec: Float, val durSec: Float, va
  * in the 300 Hz-3.4 kHz midrange, so the bright options ring clearly above it, and Deep sits below it.
  */
 enum class Chime(val label: String, private val tones: List<Tone>) {
-    Ping("Ping", listOf(
-        Tone(1319f, 0f, 0.55f, listOf(Partial(1f, 1f), Partial(2.76f, 0.22f))),
-    )),
-    Rise("Chime", listOf(
-        Tone(1047f, 0f, 0.45f, listOf(Partial(1f, 1f), Partial(2f, 0.28f))),
-        Tone(1568f, 0.17f, 0.65f, listOf(Partial(1f, 1f), Partial(2f, 0.22f))),
-    )),
-    Bell("Bell", listOf(
-        Tone(988f, 0f, 1.05f, listOf(Partial(1f, 1f), Partial(2.4f, 0.5f), Partial(3.9f, 0.22f), Partial(5.1f, 0.1f))),
-    )),
+    // Deep sits below the speech midrange, so it carries over narration without masking any words.
     Deep("Deep", listOf(
         Tone(165f, 0f, 0.7f, listOf(Partial(1f, 1f), Partial(2f, 0.45f), Partial(4f, 0.12f))),
         Tone(247f, 0.13f, 0.6f, listOf(Partial(1f, 1f), Partial(2f, 0.4f))),
+    )),
+    Pulse("Pulse", listOf(
+        Tone(130f, 0f, 0.9f, listOf(Partial(1f, 1f), Partial(2f, 0.4f), Partial(3f, 0.12f))),
+    )),
+    Double("Double", listOf(
+        Tone(110f, 0f, 0.4f, listOf(Partial(1f, 1f), Partial(2f, 0.45f))),
+        Tone(110f, 0.3f, 0.5f, listOf(Partial(1f, 1f), Partial(2f, 0.45f))),
+    )),
+    Drop("Drop", listOf(
+        Tone(247f, 0f, 0.5f, listOf(Partial(1f, 1f), Partial(2f, 0.4f))),
+        Tone(165f, 0.16f, 0.75f, listOf(Partial(1f, 1f), Partial(2f, 0.45f), Partial(4f, 0.12f))),
     ));
 
     fun render(volume: Int): ShortArray {

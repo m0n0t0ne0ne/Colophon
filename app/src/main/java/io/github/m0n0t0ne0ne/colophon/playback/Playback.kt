@@ -307,7 +307,7 @@ class PlayerHub(private val context: Context) {
     @Volatile private var sleepChapterStarts: List<Long> = emptyList()
     private var shake: ShakeDetector? = null
     /** The notification sound and its volume, set from settings. */
-    @Volatile var chimeSound = Chime.Ping
+    @Volatile var chimeSound = Chime.Deep
     @Volatile var chimeVolume = 85
     /** Seconds to skip back when resuming after a long pause; set from settings. */
     @Volatile var longAwayRewindSec = 15

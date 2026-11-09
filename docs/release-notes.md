@@ -1,5 +1,4 @@
-Replaces the notification sounds and drops the volume ducking.
+Makes the notification sounds all deep variations.
 
-- New notification sounds (Ping, Chime, Bell, Deep) are synthesized to sit above or below the speech range, so they're heard over narration without lowering the book.
-- The book's volume is no longer dipped for the chime.
-- Notification sounds are louder, and the volume slider maps to the actual level.
+- The notification sounds are now Deep, Pulse, Double, and Drop — all low tones that are heard over narration without covering any words.
+- The brighter sounds were removed.
