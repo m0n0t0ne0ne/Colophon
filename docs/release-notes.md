@@ -1,3 +1,4 @@
-Fixes the pause/play rewind loop.
+Fixes the End of chapter sleep timer.
 
-- Pausing and resuming now skips back once by a few seconds, instead of rewinding over and over and refusing to play.
+- End of chapter now stops at the end of the current chapter instead of playing on into the next one.
+- Skipping to another chapter still re-targets the timer to that chapter's end.

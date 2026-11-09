@@ -47,6 +47,8 @@ import java.io.File
 import kotlin.math.abs
 
 private const val SAVE_INTERVAL_MS = 5_000L
+// A tick of normal playback moves the position at most this far; a bigger jump is a skip.
+private const val PLAYBACK_STEP_MAX_MS = 10_000L
 private const val JUMP_WORTH_REMEMBERING_MS = 60_000L
 private const val FINISHED_MARGIN_MS = 30_000L
 
@@ -302,6 +304,9 @@ class PlayerHub(private val context: Context) {
     private var sleepJob: Job? = null
     @Volatile private var sleepRemainingMs = 0L
     @Volatile private var sleepEndOfChapter = false
+    @Volatile private var sleepTargetMs = 0L
+    @Volatile private var sleepLastPos = -1L
+    @Volatile private var sleepChapterStarts: List<Long> = emptyList()
     private var shake: ShakeDetector? = null
     /** The notification sound and its volume, set from settings. */
     @Volatile var chimeSound = Chime.Beep
@@ -427,13 +432,36 @@ class PlayerHub(private val context: Context) {
         if (shakeExtendMs > 0) startShake(shakeExtendMs)
         var chimed = false
         sleepJob = scope.launch {
+            if (sleepEndOfChapter) {
+                sleepChapterStarts = _state.value.bookId?.let { dao.chapters(it, ChapterSet.CURRENT).map { c -> c.startMs } } ?: emptyList()
+                sleepTargetMs = chapterEndAfter(_state.value.positionMs)
+                sleepLastPos = -1L
+            }
             while (true) {
                 val playing = (RawPlayer.current ?: controller)?.isPlaying == true
-                val remaining = if (sleepEndOfChapter) (chapterRemainingMs() ?: Long.MAX_VALUE) else sleepRemainingMs
-                _state.value = _state.value.copy(sleepLeftMs = remaining.takeIf { it != Long.MAX_VALUE })
+                val remaining: Long
+                if (sleepEndOfChapter) {
+                    val pos = _state.value.positionMs
+                    val step = pos - sleepLastPos
+                    when {
+                        // Normal playback reached the chapter's end: stop here.
+                        sleepLastPos in 0 until pos && step <= PLAYBACK_STEP_MAX_MS && pos >= sleepTargetMs -> {
+                            controller?.pause(); break
+                        }
+                        // A skip (forward, back, or to another chapter) re-targets to the chapter now playing.
+                        sleepLastPos >= 0 && (step < 0 || step > PLAYBACK_STEP_MAX_MS) -> {
+                            sleepTargetMs = chapterEndAfter(pos)
+                        }
+                    }
+                    sleepLastPos = pos
+                    remaining = (sleepTargetMs - pos).coerceAtLeast(0)
+                } else {
+                    remaining = sleepRemainingMs
+                }
+                _state.value = _state.value.copy(sleepLeftMs = remaining)
                 if (chime && !chimed && remaining in 1..60_000) { chimed = true; playChime() }
                 if (remaining > 60_000) chimed = false
-                if (remaining <= 0) break
+                if (!sleepEndOfChapter && remaining <= 0) break
                 delay(1000)
                 if (!sleepEndOfChapter && playing) sleepRemainingMs -= 1000
             }
@@ -444,13 +472,9 @@ class PlayerHub(private val context: Context) {
         }
     }
 
-    /** Time left in the current chapter, from the session's chapter-relative clock, or null if unknown. */
-    private fun chapterRemainingMs(): Long? {
-        val c = controller ?: return null
-        val duration = c.duration
-        if (duration == C.TIME_UNSET || duration <= 0) return null
-        return (duration - c.currentPosition).coerceAtLeast(0)
-    }
+    /** The global time at which the chapter containing [pos] ends: the next chapter start, or the book's end. */
+    private fun chapterEndAfter(pos: Long): Long =
+        sleepChapterStarts.firstOrNull { it > pos } ?: _state.value.durationMs.coerceAtLeast(pos + 1)
 
     private fun startShake(extendMs: Long) {
         val manager = context.getSystemService(SensorManager::class.java) ?: return
@@ -460,7 +484,7 @@ class PlayerHub(private val context: Context) {
                 when {
                     sleepEndOfChapter -> {
                         // Turn the end-of-chapter timer into a fixed one so it can run past the chapter.
-                        sleepRemainingMs = (chapterRemainingMs() ?: 0) + extendMs
+                        sleepRemainingMs = (sleepTargetMs - _state.value.positionMs).coerceAtLeast(0) + extendMs
                         sleepEndOfChapter = false
                         playShakeAck()
                     }
