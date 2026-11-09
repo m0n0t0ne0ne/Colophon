@@ -6,8 +6,6 @@ import android.content.Context
 import android.content.Intent
 import android.hardware.Sensor
 import android.hardware.SensorManager
-import android.media.AudioManager
-import android.media.ToneGenerator
 import android.net.Uri
 import android.os.Bundle
 import androidx.annotation.OptIn
@@ -309,9 +307,8 @@ class PlayerHub(private val context: Context) {
     @Volatile private var sleepChapterStarts: List<Long> = emptyList()
     private var shake: ShakeDetector? = null
     /** The notification sound and its volume, set from settings. */
-    @Volatile var chimeSound = Chime.Beep
-    @Volatile var chimeVolume = 70
-    private var duckedFrom: Float? = null
+    @Volatile var chimeSound = Chime.Ping
+    @Volatile var chimeVolume = 85
     /** Seconds to skip back when resuming after a long pause; set from settings. */
     @Volatile var longAwayRewindSec = 15
     private val _state = MutableStateFlow(PlayerState())
@@ -502,24 +499,7 @@ class PlayerHub(private val context: Context) {
 
     private fun playShakeAck() = playTone()
 
-    private fun playTone() {
-        val sound = chimeSound
-        runCatching {
-            val tone = ToneGenerator(AudioManager.STREAM_MUSIC, chimeVolume.coerceIn(1, 100))
-            // Drop the book's volume briefly so a short beep isn't lost under the narration.
-            val raw = RawPlayer.current
-            if (raw != null && duckedFrom == null) {
-                duckedFrom = raw.volume
-                raw.volume = raw.volume * 0.15f
-            }
-            tone.startTone(sound.tone, sound.ms)
-            scope.launch {
-                delay(sound.ms + 450L)
-                runCatching { tone.release() }
-                duckedFrom?.let { RawPlayer.current?.volume = it; duckedFrom = null }
-            }
-        }
-    }
+    private fun playTone() = ChimeSynth.play(chimeSound, chimeVolume)
 
     private fun stopShake() {
         shake?.let { context.getSystemService(SensorManager::class.java)?.unregisterListener(it) }

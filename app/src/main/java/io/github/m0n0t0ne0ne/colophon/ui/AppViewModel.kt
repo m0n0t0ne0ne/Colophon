@@ -40,7 +40,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { dao.pruneTrivialHistory() }
         hub.longAwayRewindSec = prefs.getInt("resumeRewindSec", 15)
         hub.chimeSound = Chime.from(prefs.getString("sleepSound", null))
-        hub.chimeVolume = prefs.getInt("sleepVolume", 70)
+        hub.chimeVolume = prefs.getInt("sleepVolume", 85)
     }
 
     fun setSleepSound(sound: Chime) {
@@ -97,7 +97,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val sleepShake = MutableStateFlow(prefs.getBoolean("sleepShake", false))
     val sleepShakeMin = MutableStateFlow(prefs.getInt("sleepShakeMin", 5))
     val sleepSound = MutableStateFlow(Chime.from(prefs.getString("sleepSound", null)))
-    val sleepVolume = MutableStateFlow(prefs.getInt("sleepVolume", 70))
+    val sleepVolume = MutableStateFlow(prefs.getInt("sleepVolume", 85))
 
     val analysis: StateFlow<List<AnalysisRun>> = WorkManager.getInstance(app)
         .getWorkInfosByTagLiveData(AnalyzeWorker.TAG).asFlow()

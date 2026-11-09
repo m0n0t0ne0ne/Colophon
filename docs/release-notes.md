@@ -1,4 +1,5 @@
-Makes the sleep-timer chime audible and adds a custom length.
+Replaces the notification sounds and drops the volume ducking.
 
-- The 1-minute chime now briefly lowers the book so the sound can be heard over the narration.
-- You can set a custom sleep length in minutes, alongside the presets.
+- New notification sounds (Ping, Chime, Bell, Deep) are synthesized to sit above or below the speech range, so they're heard over narration without lowering the book.
+- The book's volume is no longer dipped for the chime.
+- Notification sounds are louder, and the volume slider maps to the actual level.
