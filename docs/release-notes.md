@@ -1,4 +1,3 @@
-Makes the notification sounds all deep variations.
+Removes the pop at the end of the notification sounds.
 
-- The notification sounds are now Deep, Pulse, Double, and Drop — all low tones that are heard over narration without covering any words.
-- The brighter sounds were removed.
+- Each sound now fades to silence with a short release, so there's no static pop when it ends.

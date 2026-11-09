@@ -42,7 +42,8 @@ enum class Chime(val label: String, private val tones: List<Tone>) {
     fun render(volume: Int): ShortArray {
         val amp = (volume.coerceIn(0, 100) / 100f) * 0.95f
         val total = tones.maxOf { it.atSec + it.durSec }
-        val count = (total * SAMPLE_RATE).toInt().coerceAtLeast(1)
+        // A little trailing silence so the device settles after the last sample.
+        val count = ((total + TAIL_SEC) * SAMPLE_RATE).toInt().coerceAtLeast(1)
         val buf = FloatArray(count)
         for (tone in tones) {
             val start = (tone.atSec * SAMPLE_RATE).toInt()
@@ -52,8 +53,11 @@ enum class Chime(val label: String, private val tones: List<Tone>) {
                 val idx = start + i
                 if (idx >= count) break
                 val t = i / SAMPLE_RATE.toFloat()
-                val attack = (t / 0.005f).coerceAtMost(1f)
-                val env = attack * exp(-t / decay)
+                // Fade in over the attack and out over the release so each tone starts and ends at
+                // exactly zero; otherwise the jump to silence is heard as a static pop.
+                val attack = (t / ATTACK_SEC).coerceAtMost(1f)
+                val release = ((tone.durSec - t) / RELEASE_SEC).coerceIn(0f, 1f)
+                val env = attack * release * exp(-t / decay)
                 var s = 0f
                 for (p in tone.partials) s += p.gain * sin(2.0 * PI * tone.freq * p.ratio * t).toFloat()
                 buf[idx] += env * s
@@ -66,6 +70,9 @@ enum class Chime(val label: String, private val tones: List<Tone>) {
 
     companion object {
         private const val SAMPLE_RATE = 44100
+        private const val ATTACK_SEC = 0.006f
+        private const val RELEASE_SEC = 0.025f
+        private const val TAIL_SEC = 0.02f
         fun from(name: String?): Chime = entries.firstOrNull { it.name == name } ?: entries.first()
     }
 }
