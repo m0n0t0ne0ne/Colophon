@@ -6,7 +6,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -69,6 +71,7 @@ fun PlayerContent(
     var sheet by remember { mutableStateOf<String?>(null) }
     var dragging by remember { mutableStateOf<Float?>(null) }
     var menu by remember { mutableStateOf(false) }
+    var sleepCustom by remember { mutableStateOf("") }
 
     val position = state.positionMs
     val duration = state.durationMs.coerceAtLeast(1)
@@ -202,6 +205,17 @@ fun PlayerContent(
                 }
                 if (chapter != null && chapterEnd > position) {
                     ChoiceChip("End of chapter", state.sleepChoice == "chapter", Modifier.fillMaxWidth()) { actions.onSleepChapter(); sheet = null }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        sleepCustom, { sleepCustom = it.filter(Char::isDigit).take(3) },
+                        singleLine = true, placeholder = { Text("Minutes") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                    )
+                    SecondaryButton("Start", Modifier.height(56.dp)) {
+                        sleepCustom.toIntOrNull()?.takeIf { it > 0 }?.let { actions.onSleep(it); sleepCustom = ""; sheet = null }
+                    }
                 }
                 if (state.sleepLeftMs != null) SecondaryButton("Turn off", Modifier.fillMaxWidth()) { actions.onSleep(null); sheet = null }
             }

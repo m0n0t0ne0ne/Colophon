@@ -1,4 +1,4 @@
-Fixes the End of chapter sleep timer.
+Makes the sleep-timer chime audible and adds a custom length.
 
-- End of chapter now stops at the end of the current chapter instead of playing on into the next one.
-- Skipping to another chapter still re-targets the timer to that chapter's end.
+- The 1-minute chime now briefly lowers the book so the sound can be heard over the narration.
+- You can set a custom sleep length in minutes, alongside the presets.

@@ -311,6 +311,7 @@ class PlayerHub(private val context: Context) {
     /** The notification sound and its volume, set from settings. */
     @Volatile var chimeSound = Chime.Beep
     @Volatile var chimeVolume = 70
+    private var duckedFrom: Float? = null
     /** Seconds to skip back when resuming after a long pause; set from settings. */
     @Volatile var longAwayRewindSec = 15
     private val _state = MutableStateFlow(PlayerState())
@@ -505,8 +506,18 @@ class PlayerHub(private val context: Context) {
         val sound = chimeSound
         runCatching {
             val tone = ToneGenerator(AudioManager.STREAM_MUSIC, chimeVolume.coerceIn(1, 100))
+            // Drop the book's volume briefly so a short beep isn't lost under the narration.
+            val raw = RawPlayer.current
+            if (raw != null && duckedFrom == null) {
+                duckedFrom = raw.volume
+                raw.volume = raw.volume * 0.15f
+            }
             tone.startTone(sound.tone, sound.ms)
-            scope.launch { delay(sound.ms + 300L); runCatching { tone.release() } }
+            scope.launch {
+                delay(sound.ms + 450L)
+                runCatching { tone.release() }
+                duckedFrom?.let { RawPlayer.current?.volume = it; duckedFrom = null }
+            }
         }
     }
 
