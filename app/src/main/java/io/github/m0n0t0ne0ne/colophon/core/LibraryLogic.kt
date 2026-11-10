@@ -383,14 +383,11 @@ object ChapterNumbering {
         RegexOption.IGNORE_CASE,
     )
 
-    /** Zero-pads the leading number in each numbered title to the width of the largest number (at least 2). */
-    fun padTitles(titles: List<String>): List<String> {
-        val numbers = titles.mapNotNull { LEADING.find(it)?.groupValues?.get(2)?.toIntOrNull() }
-        val width = (numbers.maxOfOrNull { it.toString().length } ?: return titles).coerceAtLeast(2)
-        return titles.map { title ->
+    /** Zero-pads the leading number in each numbered title to the given width (longer numbers stay whole). */
+    fun padTitles(titles: List<String>, width: Int): List<String> =
+        titles.map { title ->
             val m = LEADING.find(title) ?: return@map title
             val n = m.groupValues[2].toIntOrNull() ?: return@map title
             m.groupValues[1] + n.toString().padStart(width, '0') + m.groupValues[3]
         }
-    }
 }

@@ -188,16 +188,20 @@ class ResumeRewindTest {
 }
 
 class ChapterNumberingTest {
-    @org.junit.Test fun padsLeadingNumbersToAUniformWidth() {
-        val out = ChapterNumbering.padTitles(listOf("2 - Death Cookie", "16 - Scene", "110 - End", "Chapter 3"))
+    @org.junit.Test fun padsToThreeDigits() {
+        val out = ChapterNumbering.padTitles(listOf("2 - Death Cookie", "16 - Scene", "110 - End", "Chapter 3"), 3)
         assertEquals(listOf("002 - Death Cookie", "016 - Scene", "110 - End", "Chapter 003"), out)
     }
+    @org.junit.Test fun padsToTwoDigitsAndKeepsLongerNumbersWhole() {
+        val out = ChapterNumbering.padTitles(listOf("2 - A", "60 - B", "110 - C"), 2)
+        assertEquals(listOf("02 - A", "60 - B", "110 - C"), out)
+    }
     @org.junit.Test fun leavesTitlesWithoutLeadingNumbersAlone() {
-        val out = ChapterNumbering.padTitles(listOf("5 - A", "Prologue", "The 3 Musketeers"))
+        val out = ChapterNumbering.padTitles(listOf("5 - A", "Prologue", "The 3 Musketeers"), 2)
         assertEquals(listOf("05 - A", "Prologue", "The 3 Musketeers"), out)
     }
     @org.junit.Test fun isIdempotent() {
-        val once = ChapterNumbering.padTitles(listOf("2 - A", "100 - B"))
-        assertEquals(once, ChapterNumbering.padTitles(once))
+        val once = ChapterNumbering.padTitles(listOf("2 - A", "100 - B"), 3)
+        assertEquals(once, ChapterNumbering.padTitles(once, 3))
     }
 }

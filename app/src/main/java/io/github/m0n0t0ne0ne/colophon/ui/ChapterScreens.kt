@@ -42,7 +42,7 @@ fun ChaptersContent(
     onReview: () -> Unit,
     onAddHere: () -> Unit,
     onReset: () -> Unit,
-    onPadNumbers: () -> Unit,
+    onPadNumbers: (Int) -> Unit,
     onDeleteBookmark: (Long) -> Unit,
 ) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
@@ -67,7 +67,8 @@ fun ChaptersContent(
             Box {
                 IconBtn(Ic.More, "Chapter options") { menu = true }
                 DropdownMenu(menu, { menu = false }) {
-                    DropdownMenuItem(text = { Text("Pad numbers (001, 002…)") }, onClick = { menu = false; onPadNumbers() })
+                    DropdownMenuItem(text = { Text("Pad numbers to 01, 02…") }, onClick = { menu = false; onPadNumbers(2) })
+                    DropdownMenuItem(text = { Text("Pad numbers to 001, 002…") }, onClick = { menu = false; onPadNumbers(3) })
                 }
             }
         }

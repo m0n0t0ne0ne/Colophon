@@ -1,4 +1,4 @@
-Adds a batch Pad numbers action for chapters.
+Lets you choose the chapter number width.
 
-- On the Chapters screen, the ⋮ menu can zero-pad every chapter's number to a uniform width, so "2 - Name" becomes "002 - Name" across the book.
-- The width matches the largest number, so a book numbered up to 110 pads to three digits.
+- The Chapters ⋮ menu now offers padding to two digits (01, 02…) or three digits (001, 002…).
+- Numbers longer than the chosen width are left whole.
