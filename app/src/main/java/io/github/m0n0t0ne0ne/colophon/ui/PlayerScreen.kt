@@ -209,12 +209,18 @@ fun PlayerContent(
                     Slider(strength, actions.onStrength, colors = SliderDefaults.colors(thumbColor = OnArt, activeTrackColor = OnArt, inactiveTrackColor = C.Border))
                 }
                 Text("Progress colour", style = Small, modifier = Modifier.padding(top = 4.dp))
+                var trueTone by remember { mutableStateOf(true) }
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    ChoiceChip("Truer", trueTone, Modifier.weight(1f)) { trueTone = true }
+                    ChoiceChip("Softer", !trueTone, Modifier.weight(1f)) { trueTone = false }
+                }
                 Row(
                     Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     ColorDot(autoAccent, selected = accentChoice == null, label = "A") { actions.onAccent(null) }
-                    colors.swatches.forEach { c ->
+                    val set = if (trueTone) colors.swatchesVivid else colors.swatchesSoft
+                    set.forEach { c ->
                         ColorDot(c, selected = accentChoice?.toArgb() == c.toArgb()) { actions.onAccent(c) }
                     }
                 }

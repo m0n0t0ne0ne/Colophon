@@ -27,7 +27,12 @@ import kotlinx.coroutines.withContext
 
 enum class BackgroundMode(val label: String) { Art("Book art"), Color("Art color"), Black("Black") }
 
-data class ArtColors(val tone: Color, val accent: Color, val swatches: List<Color> = emptyList())
+data class ArtColors(
+    val tone: Color,
+    val accent: Color,
+    val swatchesSoft: List<Color> = emptyList(),
+    val swatchesVivid: List<Color> = emptyList(),
+)
 
 data class AnalysisRun(val bookId: Long, val state: WorkInfo.State, val stage: Int, val percent: Int, val detail: String)
 
@@ -363,24 +368,36 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val palette = Palette.from(bitmap).maximumColorCount(24).generate()
             val tone = palette.getDarkMutedColor(palette.getDominantColor(0xFF2A2D31.toInt()))
             val accent = palette.getLightVibrantColor(palette.getLightMutedColor(C.Accent.value.toLong().let { 0xFF9CC2DE.toInt() }))
-            // Candidate progress colours drawn from the cover, brightened so each reads on the dark UI,
-            // ordered by how much of the cover they occupy, and de-duplicated by hue.
-            val swatches = palette.swatches
+            // Candidate progress colours drawn from the cover, ordered by how much of the cover they
+            // occupy and de-duplicated by hue. Each base colour yields two renderings:
+            //  - soft:  lifted toward white (gentle, reads easily but loses saturation)
+            //  - vivid: brightened by raising value while keeping hue and saturation (truer to the art)
+            val base = palette.swatches
                 .sortedByDescending { it.population }
-                .map { readable(Color(it.rgb)) }
+                .map { Color(it.rgb) }
                 .distinctBy { farHue(it) }
-            ArtColors(Color(tone), Color(accent), swatches.take(8))
+                .take(8)
+            ArtColors(Color(tone), Color(accent), base.map { soften(it) }, base.map { vivify(it) })
         }.getOrDefault(fallback)
     }
 
-    // Lift a swatch toward the mid-to-light range so even dark cover colours stay visible on the player.
-    private fun readable(c: Color): Color {
+    // Lift a swatch toward white so even dark cover colours stay visible; gentle but desaturating.
+    private fun soften(c: Color): Color {
         val l = c.luminance()
         return when {
             l < 0.18f -> lerp(c, Color.White, 0.45f)
             l < 0.35f -> lerp(c, Color.White, 0.22f)
             else -> c
         }
+    }
+
+    // Brighten by raising HSV value (and nudging saturation up) so the colour stays true to the cover.
+    private fun vivify(c: Color): Color {
+        val hsv = FloatArray(3)
+        android.graphics.Color.colorToHSV(c.toArgb(), hsv)
+        hsv[2] = hsv[2].coerceAtLeast(0.72f)
+        hsv[1] = (hsv[1] * 1.1f).coerceAtMost(1f)
+        return Color(android.graphics.Color.HSVToColor(hsv))
     }
 
     // Bucket hue + a coarse lightness band so near-identical swatches collapse to one choice.
