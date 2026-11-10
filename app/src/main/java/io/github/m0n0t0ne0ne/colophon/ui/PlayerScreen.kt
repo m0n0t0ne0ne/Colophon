@@ -147,7 +147,12 @@ fun PlayerContent(
                     },
                     modifier = Modifier.height(28.dp),
                     thumb = { Box(Modifier.size(12.dp).clip(CircleShape).background(OnArt)) },
-                    track = { ThinProgress(dragging ?: (inChapter.toFloat() / chapterLength), color = accent, track = OnArt.copy(alpha = 0.22f)) },
+                    track = {
+                        // Centre the thin line in the slider's full height so the thumb sits on it.
+                        Box(Modifier.fillMaxWidth().height(28.dp), contentAlignment = Alignment.Center) {
+                            ThinProgress(dragging ?: (inChapter.toFloat() / chapterLength), color = accent, track = OnArt.copy(alpha = 0.22f))
+                        }
+                    },
                 )
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(formatClock(inChapter), style = Tiny.copy(color = OnArtSoft))

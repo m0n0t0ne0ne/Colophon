@@ -1,3 +1,3 @@
-Keeps a paused book in the media controls.
+Centers the progress dot on the seek bar.
 
-- A paused book now stays in the notification and lock-screen player (and Nothing's mini player) after you leave the app, so you can resume it there instead of it disappearing.
+- The player's progress dot now sits centered on the chapter progress line.
