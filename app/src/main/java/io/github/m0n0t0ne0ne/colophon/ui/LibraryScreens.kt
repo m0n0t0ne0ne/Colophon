@@ -191,7 +191,8 @@ private fun SeriesRow(group: SeriesGroup, onClick: () -> Unit) {
         HorizontalDivider(color = C.Line)
         Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(18.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(104.dp, 72.dp)) {
-                val fan = group.books.sortedByDescending { it.coverPath != null }.take(3)
+                // Front cover first: book 1, then 2, 3 fanned behind it.
+                val fan = group.books.sortedWith(compareBy<Book>({ it.seriesNumber ?: Double.MAX_VALUE }, { it.year ?: Int.MAX_VALUE }, { it.title })).take(3)
                 fan.reversed().forEachIndexed { i, b ->
                     val index = fan.size - 1 - i
                     val size = (72 - index * 6).dp

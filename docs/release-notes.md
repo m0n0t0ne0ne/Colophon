@@ -1,3 +1,3 @@
-Removes the pop at the end of the notification sounds.
+Orders the series cover stack by book number.
 
-- Each sound now fades to silence with a short release, so there's no static pop when it ends.
+- A series now shows book 1's cover on top, then 2 and 3 behind it, instead of ordering by cover or title.
