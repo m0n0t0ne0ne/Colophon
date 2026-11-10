@@ -87,8 +87,13 @@ class ChapterPlayerTest {
         assertEquals("Chapter 16" to "Telling the Wheel", split("Chapter 16 Telling the Wheel"))
         assertEquals("Chapter Three" to "The Road", split("Chapter Three: The Road"))
         assertEquals("Prologue" to "Ablaze", split("Prologue: Ablaze"))
+        // A number before the dash is the label, with no keyword needed.
+        assertEquals("002" to "Death Cookie", split("002 - Death Cookie"))
+        assertEquals("16" to "Scene Name", split("16 - Scene Name"))
+        assertEquals("Part 1" to "Chiba City Blues", split("Part 1 - Chiba City Blues"))
         assertEquals("Chapter 16" to null, split("Chapter 16"))
         assertEquals("Prologue" to null, split("Prologue"))
+        // A four-digit year is not a chapter number, so this book title stays whole.
         assertEquals("2013 - A Memory of Light" to null, split("2013 - A Memory of Light"))
         assertEquals("Self-Portrait" to null, split("Self-Portrait"))
     }

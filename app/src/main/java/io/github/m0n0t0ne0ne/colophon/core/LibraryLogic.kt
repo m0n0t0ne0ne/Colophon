@@ -339,20 +339,38 @@ class SectionMap(starts: List<Long>, val totalMs: Long) {
     }
 }
 
-/** A chapter title split into its place in the book ("Chapter 16") and its name ("Telling the Wheel"). */
+/**
+ * A chapter title split into its place in the book and its name, for the two-line player display.
+ * The split is driven by the separator: whatever sits before a dash or colon is the label
+ * ("Chapter 16", "Part 1", or a number like "002"), and the rest is the name.
+ */
 data class ChapterHeading(val label: String, val name: String?) {
     companion object {
-        private const val SEPARATOR = """\s*[:.\-–—]+\s+|\s*:\s*"""
-        private const val NUMBERED_WORD = """(?:chapter|ch\.?|part|book|section|volume)"""
-        private val NUMBERED = Regex("""^($NUMBERED_WORD\s+\d+)(?:$SEPARATOR|\s+)(\S.*)$""", RegexOption.IGNORE_CASE)
-        private val SPELLED = Regex("""^($NUMBERED_WORD\s+[\p{L}-]+)(?:$SEPARATOR)(\S.*)$""", RegexOption.IGNORE_CASE)
-        private val NAMED = Regex("""^(prologue|epilogue|introduction|intro|interlude|foreword|afterword)(?:$SEPARATOR)(\S.*)$""", RegexOption.IGNORE_CASE)
+        private val KEYWORD = Regex(
+            """^(?:chapter|ch\.?|part|book|section|volume|scene|track|episode|prologue|epilogue|introduction|intro|interlude|foreword|afterword)\b.*$""",
+            RegexOption.IGNORE_CASE,
+        )
+        // A colon, or a dash/en dash/em dash with a space on at least one side, so "Self-Portrait" stays whole.
+        private val SEPARATOR = Regex("""\s*[-–—]\s+|\s+[-–—]\s*|\s*:\s*""")
+        // A bare chapter or track number: one to three digits, or zero-padded like "002" (not a 4-digit year).
+        private val NUMBER = Regex("""0\d+|\d{1,3}""")
+        // "Chapter 16 Telling the Wheel": a numbered keyword, then the name, with only a space between.
+        private val KEYWORD_SPACE = Regex(
+            """^((?:chapter|ch\.?|part|book|section|volume|scene|track|episode)\s+\d+)\s+(\S.*)$""",
+            RegexOption.IGNORE_CASE,
+        )
+
+        private fun isLabel(text: String) = KEYWORD.matches(text) || NUMBER.matches(text)
 
         fun of(title: String): ChapterHeading {
             val clean = title.trim()
-            val match = NUMBERED.find(clean) ?: SPELLED.find(clean) ?: NAMED.find(clean)
-                ?: return ChapterHeading(clean, null)
-            return ChapterHeading(match.groupValues[1], match.groupValues[2].trim())
+            SEPARATOR.find(clean)?.let { m ->
+                val before = clean.substring(0, m.range.first).trim()
+                val after = clean.substring(m.range.last + 1).trim()
+                if (after.isNotEmpty() && isLabel(before)) return ChapterHeading(before, after)
+            }
+            KEYWORD_SPACE.find(clean)?.let { return ChapterHeading(it.groupValues[1].trim(), it.groupValues[2].trim()) }
+            return ChapterHeading(clean, null)
         }
     }
 }

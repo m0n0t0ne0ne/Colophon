@@ -1,3 +1,4 @@
-Orders the series cover stack by book number.
+Splits chapter titles on the dash, not just the word "Chapter".
 
-- A series now shows book 1's cover on top, then 2 and 3 behind it, instead of ordering by cover or title.
+- A title like "002 - Death Cookie" now shows the number on top and the name below, the same as "Chapter 16: Name".
+- Whatever comes before a dash or colon — a chapter, part, or a plain number — becomes the label; the rest is the title.
