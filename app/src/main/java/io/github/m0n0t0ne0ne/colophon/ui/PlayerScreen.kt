@@ -3,6 +3,8 @@ package io.github.m0n0t0ne0ne.colophon.ui
 import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,6 +26,10 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -138,20 +144,13 @@ fun PlayerContent(
             }
 
             Column {
-                Slider(
-                    value = dragging ?: (inChapter.toFloat() / chapterLength),
-                    onValueChange = { dragging = it },
-                    onValueChangeFinished = {
+                SeekBar(
+                    fraction = dragging ?: (inChapter.toFloat() / chapterLength),
+                    accent = accent,
+                    onScrub = { dragging = it },
+                    onCommit = {
                         dragging?.let { actions.onSeekTo(chapterStart + (it * chapterLength).toLong()) }
                         dragging = null
-                    },
-                    modifier = Modifier.height(28.dp),
-                    thumb = { Box(Modifier.size(12.dp).clip(CircleShape).background(OnArt)) },
-                    track = {
-                        // Centre the thin line in the slider's full height so the thumb sits on it.
-                        Box(Modifier.fillMaxWidth().height(28.dp), contentAlignment = Alignment.Center) {
-                            ThinProgress(dragging ?: (inChapter.toFloat() / chapterLength), color = accent, track = OnArt.copy(alpha = 0.22f))
-                        }
                     },
                 )
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -225,6 +224,40 @@ fun PlayerContent(
                 if (state.sleepLeftMs != null) SecondaryButton("Turn off", Modifier.fillMaxWidth()) { actions.onSleep(null); sheet = null }
             }
         }
+    }
+}
+
+@Composable
+private fun SeekBar(fraction: Float, accent: Color, onScrub: (Float) -> Unit, onCommit: () -> Unit) {
+    var width by remember { mutableIntStateOf(1) }
+    val thumbPx = with(LocalDensity.current) { 12.dp.toPx() }
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(28.dp)
+            .onSizeChanged { width = it.width.coerceAtLeast(1) }
+            .pointerInput(Unit) {
+                detectTapGestures { offset -> onScrub((offset.x / width).coerceIn(0f, 1f)); onCommit() }
+            }
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragStart = { offset -> onScrub((offset.x / width).coerceIn(0f, 1f)) },
+                    onHorizontalDrag = { change, _ -> onScrub((change.position.x / width).coerceIn(0f, 1f)) },
+                    onDragEnd = { onCommit() },
+                    onDragCancel = { onCommit() },
+                )
+            },
+    ) {
+        // The line and the thumb are both centred vertically, so the dot always sits on the line.
+        Box(Modifier.align(Alignment.Center).fillMaxWidth().height(2.dp).background(OnArt.copy(alpha = 0.22f))) {
+            Box(Modifier.fillMaxWidth(fraction.coerceIn(0f, 1f)).fillMaxHeight().background(accent))
+        }
+        Box(
+            Modifier
+                .align(Alignment.CenterStart)
+                .offset { IntOffset((fraction.coerceIn(0f, 1f) * width - thumbPx / 2f).toInt().coerceIn(0, (width - thumbPx).toInt().coerceAtLeast(0)), 0) }
+                .size(12.dp).clip(CircleShape).background(OnArt),
+        )
     }
 }
 
