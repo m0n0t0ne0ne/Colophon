@@ -265,7 +265,9 @@ class PlaybackService : MediaSessionService() {
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         val player = session?.player
-        if (player == null || !player.playWhenReady || player.mediaItemCount == 0) stopSelf()
+        // Keep the session alive while a book is loaded, even when paused, so the book stays in the
+        // media controls and you can resume from the lock screen. Only stop when nothing is loaded.
+        if (player == null || player.mediaItemCount == 0) stopSelf()
     }
 
     override fun onDestroy() {

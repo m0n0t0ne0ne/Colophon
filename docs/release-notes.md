@@ -1,4 +1,3 @@
-Keeps your place in the chapter list while editing.
+Keeps a paused book in the media controls.
 
-- Editing a chapter no longer jumps the list back to the top; it stays where you were.
-- The list still scrolls to the playing chapter when you first open it.
+- A paused book now stays in the notification and lock-screen player (and Nothing's mini player) after you leave the app, so you can resume it there instead of it disappearing.
