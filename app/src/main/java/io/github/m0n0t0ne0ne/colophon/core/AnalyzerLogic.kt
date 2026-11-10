@@ -91,6 +91,8 @@ object TitleExtractor {
     private const val HEADING_WINDOW = 5
     private const val TITLE_GAP_SEC = 0.55
     private const val MAX_TITLE_WORDS = 8
+    // A spoken chapter number is followed by a deliberate pause before the scene name.
+    private const val NUMBER_HEADING_GAP = 0.4
 
     fun parseNumber(words: List<String>): Pair<Int, Int>? {
         if (words.isEmpty()) return null
@@ -137,7 +139,30 @@ object TitleExtractor {
             val reason = if (at > 2) "\"$label\" heard mid-sentence?" else null
             return Heading(kind, number, "$label $number", rest, reason)
         }
+
+        // Some books (numbered scenes) announce just the number, then pause, then the scene name:
+        // "Two. Death Cookie". The pause after the number separates it from ordinary narration.
+        parseNumber(lower)?.let { (number, used) ->
+            if (used < words.size && words[used].startSec - words[used - 1].endSec >= NUMBER_HEADING_GAP) {
+                val name = phraseAfter(words, used)
+                if (name.isNotBlank()) return Heading(SectionKind.CHAPTER, number, "Chapter $number", name, null)
+            }
+        }
         return null
+    }
+
+    /** The scene name spoken after a number's pause, ending at the next pause. */
+    private fun phraseAfter(words: List<Word>, from: Int): String {
+        if (from >= words.size) return ""
+        val out = mutableListOf(words[from].text)
+        var i = from + 1
+        var sawGap = false
+        while (i < words.size && out.size < MAX_TITLE_WORDS) {
+            if (words[i].startSec - words[i - 1].endSec >= TITLE_GAP_SEC) { sawGap = true; break }
+            out += words[i].text
+            i++
+        }
+        return if (sawGap) titleCase(out) else ""
     }
 
     private fun indexOf(words: List<String>, key: List<String>): Int {
