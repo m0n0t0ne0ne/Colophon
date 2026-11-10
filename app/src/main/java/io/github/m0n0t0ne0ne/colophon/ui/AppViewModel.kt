@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
+import io.github.m0n0t0ne0ne.colophon.core.ChapterNumbering
 import io.github.m0n0t0ne0ne.colophon.playback.Chime
 import android.net.Uri
 import androidx.compose.ui.graphics.Color
@@ -248,6 +249,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun deleteBookmark(id: Long) { viewModelScope.launch { dao.deleteBookmark(id) } }
     fun saveChapter(chapter: Chapter) { viewModelScope.launch { dao.updateChapter(chapter) } }
+
+    /** Zero-pads the numbers in every chapter title to a uniform width, e.g. "2 - Name" to "002 - Name". */
+    fun padChapterNumbers(bookId: Long) {
+        viewModelScope.launch {
+            val chapters = dao.chapters(bookId, ChapterSet.CURRENT)
+            val padded = ChapterNumbering.padTitles(chapters.map { it.title })
+            val changed = chapters.zip(padded).count { (c, t) -> c.title != t && run { dao.updateChapter(c.copy(title = t)); true } }
+            message.value = if (changed > 0) "Padded $changed chapter numbers." else "No chapter numbers to pad."
+        }
+    }
     fun deleteChapter(id: Long) { viewModelScope.launch { dao.deleteChapter(id) } }
 
     fun addChapter(bookId: Long, set: String, startMs: Long) {

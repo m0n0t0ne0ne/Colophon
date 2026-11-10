@@ -42,10 +42,12 @@ fun ChaptersContent(
     onReview: () -> Unit,
     onAddHere: () -> Unit,
     onReset: () -> Unit,
+    onPadNumbers: () -> Unit,
     onDeleteBookmark: (Long) -> Unit,
 ) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var confirmReset by remember { mutableStateOf(false) }
+    var menu by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val currentIndex = if (current.isEmpty()) 0 else Timeline.chapterAt(current.map { it.startMs }, positionMs)
     LaunchedEffect(current.size) { if (current.isNotEmpty()) listState.scrollToItem((currentIndex - 2).coerceAtLeast(0)) }
@@ -61,6 +63,12 @@ fun ChaptersContent(
                 Icon(Ic.Wave, null, Modifier.size(16.dp))
                 Spacer(Modifier.width(7.dp))
                 Text(if (hasReview) "Review results" else "Analyze audio", fontFamily = Sans)
+            }
+            Box {
+                IconBtn(Ic.More, "Chapter options") { menu = true }
+                DropdownMenu(menu, { menu = false }) {
+                    DropdownMenuItem(text = { Text("Pad numbers (001, 002…)") }, onClick = { menu = false; onPadNumbers() })
+                }
             }
         }
         UnderlineTabs(listOf("Your chapters", "Original file", "Bookmarks"), tab) { tab = it }

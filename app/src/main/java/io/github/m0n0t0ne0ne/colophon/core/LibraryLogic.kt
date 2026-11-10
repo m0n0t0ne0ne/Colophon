@@ -374,3 +374,23 @@ data class ChapterHeading(val label: String, val name: String?) {
         }
     }
 }
+
+/** Batch helpers for a book's chapter titles. */
+object ChapterNumbering {
+    // An optional keyword, then the leading number, then the rest of the title.
+    private val LEADING = Regex(
+        """^(\s*(?:chapter|ch\.?|part|book|section|volume|scene|track|episode)\s+)?(\d+)(.*)$""",
+        RegexOption.IGNORE_CASE,
+    )
+
+    /** Zero-pads the leading number in each numbered title to the width of the largest number (at least 2). */
+    fun padTitles(titles: List<String>): List<String> {
+        val numbers = titles.mapNotNull { LEADING.find(it)?.groupValues?.get(2)?.toIntOrNull() }
+        val width = (numbers.maxOfOrNull { it.toString().length } ?: return titles).coerceAtLeast(2)
+        return titles.map { title ->
+            val m = LEADING.find(title) ?: return@map title
+            val n = m.groupValues[2].toIntOrNull() ?: return@map title
+            m.groupValues[1] + n.toString().padStart(width, '0') + m.groupValues[3]
+        }
+    }
+}

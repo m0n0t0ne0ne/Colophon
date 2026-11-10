@@ -194,6 +194,7 @@ private fun ChaptersRoute(vm: AppViewModel, nav: NavHostController, id: Long) {
         { nav.navigate("review/$id") },
         { vm.addChapter(id, ChapterSet.CURRENT, state.positionMs) },
         { vm.resetChapters(id) },
+        { vm.padChapterNumbers(id) },
         vm::deleteBookmark,
     )
 }

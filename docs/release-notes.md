@@ -1,4 +1,4 @@
-Opens a tapped book paused, and keeps "Chapter" out of unspoken titles.
+Adds a batch Pad numbers action for chapters.
 
-- Tapping a book now opens the player without starting playback — you press play.
-- When the analyzer reads a scene announced only by number, it labels it with the number alone, not "Chapter N".
+- On the Chapters screen, the ⋮ menu can zero-pad every chapter's number to a uniform width, so "2 - Name" becomes "002 - Name" across the book.
+- The width matches the largest number, so a book numbered up to 110 pads to three digits.

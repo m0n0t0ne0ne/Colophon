@@ -186,3 +186,18 @@ class ResumeRewindTest {
         assertEquals(0L, Resume.rewindMs(3_600_000, 0))             // off
     }
 }
+
+class ChapterNumberingTest {
+    @org.junit.Test fun padsLeadingNumbersToAUniformWidth() {
+        val out = ChapterNumbering.padTitles(listOf("2 - Death Cookie", "16 - Scene", "110 - End", "Chapter 3"))
+        assertEquals(listOf("002 - Death Cookie", "016 - Scene", "110 - End", "Chapter 003"), out)
+    }
+    @org.junit.Test fun leavesTitlesWithoutLeadingNumbersAlone() {
+        val out = ChapterNumbering.padTitles(listOf("5 - A", "Prologue", "The 3 Musketeers"))
+        assertEquals(listOf("05 - A", "Prologue", "The 3 Musketeers"), out)
+    }
+    @org.junit.Test fun isIdempotent() {
+        val once = ChapterNumbering.padTitles(listOf("2 - A", "100 - B"))
+        assertEquals(once, ChapterNumbering.padTitles(once))
+    }
+}
