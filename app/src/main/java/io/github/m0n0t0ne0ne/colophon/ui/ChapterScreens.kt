@@ -50,7 +50,14 @@ fun ChaptersContent(
     var menu by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val currentIndex = if (current.isEmpty()) 0 else Timeline.chapterAt(current.map { it.startMs }, positionMs)
-    LaunchedEffect(current.size) { if (current.isNotEmpty()) listState.scrollToItem((currentIndex - 2).coerceAtLeast(0)) }
+    // Scroll to the playing chapter only on first open; keep the reader's place after editing a chapter.
+    var scrolledToCurrent by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(current.size) {
+        if (!scrolledToCurrent && current.isNotEmpty()) {
+            listState.scrollToItem((currentIndex - 2).coerceAtLeast(0))
+            scrolledToCurrent = true
+        }
+    }
 
     Column(Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 20.dp)) {
         HeaderRow("Chapters", onBack) {

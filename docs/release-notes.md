@@ -1,4 +1,4 @@
-Lets you choose the chapter number width.
+Keeps your place in the chapter list while editing.
 
-- The Chapters ⋮ menu now offers padding to two digits (01, 02…) or three digits (001, 002…).
-- Numbers longer than the chosen width are left whole.
+- Editing a chapter no longer jumps the list back to the top; it stays where you were.
+- The list still scrolls to the playing chapter when you first open it.
