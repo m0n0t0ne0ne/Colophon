@@ -75,10 +75,13 @@ class ScreensTest {
 
     private fun player(mode: BackgroundMode, name: String) {
         val book = sampleBooks()[2]
-        val colors = ArtColors(Color(0xFF6B3A28), Color(0xFFF0A868))
+        val colors = ArtColors(
+            Color(0xFF6B3A28), Color(0xFFF0A868),
+            listOf(Color(0xFFF0A868), Color(0xFFE8604C), Color(0xFF9CC2DE), Color(0xFFBFA98C)),
+        )
         rule.setContent {
             ColophonTheme {
-                PlayerContent(book, PlayerState(bookId = 3, positionMs = 23 * hours, durationMs = 30 * hours, playing = true), chapters, mode, 0.6f, colors, emptyList(), PlayerActions())
+                PlayerContent(book, PlayerState(bookId = 3, positionMs = 23 * hours, durationMs = 30 * hours, playing = true), chapters, mode, 0.6f, colors, null, emptyList(), PlayerActions())
             }
         }
         shoot(name)

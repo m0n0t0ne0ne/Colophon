@@ -8,6 +8,9 @@ import io.github.m0n0t0ne0ne.colophon.core.ChapterNumbering
 import io.github.m0n0t0ne0ne.colophon.playback.Chime
 import android.net.Uri
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.asFlow
 import androidx.lifecycle.viewModelScope
@@ -24,7 +27,7 @@ import kotlinx.coroutines.withContext
 
 enum class BackgroundMode(val label: String) { Art("Book art"), Color("Art color"), Black("Black") }
 
-data class ArtColors(val tone: Color, val accent: Color)
+data class ArtColors(val tone: Color, val accent: Color, val swatches: List<Color> = emptyList())
 
 data class AnalysisRun(val bookId: Long, val state: WorkInfo.State, val stage: Int, val percent: Int, val detail: String)
 
@@ -357,11 +360,47 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         runCatching {
             val options = BitmapFactory.Options().apply { inSampleSize = 4 }
             val bitmap = BitmapFactory.decodeFile(path, options) ?: return@withContext fallback
-            val palette = Palette.from(bitmap).generate()
+            val palette = Palette.from(bitmap).maximumColorCount(24).generate()
             val tone = palette.getDarkMutedColor(palette.getDominantColor(0xFF2A2D31.toInt()))
             val accent = palette.getLightVibrantColor(palette.getLightMutedColor(C.Accent.value.toLong().let { 0xFF9CC2DE.toInt() }))
-            ArtColors(Color(tone), Color(accent))
+            // Candidate progress colours drawn from the cover, brightened so each reads on the dark UI,
+            // ordered by how much of the cover they occupy, and de-duplicated by hue.
+            val swatches = palette.swatches
+                .sortedByDescending { it.population }
+                .map { readable(Color(it.rgb)) }
+                .distinctBy { farHue(it) }
+            ArtColors(Color(tone), Color(accent), swatches.take(8))
         }.getOrDefault(fallback)
+    }
+
+    // Lift a swatch toward the mid-to-light range so even dark cover colours stay visible on the player.
+    private fun readable(c: Color): Color {
+        val l = c.luminance()
+        return when {
+            l < 0.18f -> lerp(c, Color.White, 0.45f)
+            l < 0.35f -> lerp(c, Color.White, 0.22f)
+            else -> c
+        }
+    }
+
+    // Bucket hue + a coarse lightness band so near-identical swatches collapse to one choice.
+    private fun farHue(c: Color): Int {
+        val hsv = FloatArray(3)
+        android.graphics.Color.colorToHSV(c.toArgb(), hsv)
+        val sat = hsv[1]
+        val hueBucket = if (sat < 0.12f) -1 else (hsv[0] / 30f).toInt()  // greys share one bucket
+        return hueBucket * 10 + (hsv[2] * 3f).toInt()
+    }
+
+    val accentOverride = MutableStateFlow<Color?>(null)
+
+    fun loadAccent(bookId: Long) {
+        accentOverride.value = if (prefs.contains("accent_$bookId")) Color(prefs.getInt("accent_$bookId", 0)) else null
+    }
+
+    fun setAccent(bookId: Long, color: Color?) {
+        accentOverride.value = color
+        prefs.edit().apply { if (color == null) remove("accent_$bookId") else putInt("accent_$bookId", color.toArgb()) }.apply()
     }
 }
 

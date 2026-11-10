@@ -153,13 +153,15 @@ private fun PlayerRoute(vm: AppViewModel, nav: NavHostController, id: Long) {
     val state by vm.hub.state.collectAsStateWithLifecycle()
     val mode by vm.backgroundMode.collectAsStateWithLifecycle()
     val strength by vm.backgroundStrength.collectAsStateWithLifecycle()
+    val accentOverride by vm.accentOverride.collectAsStateWithLifecycle()
     val b = book ?: return
     var colors by remember { mutableStateOf(ArtColors(C.Raised, C.Accent)) }
     LaunchedEffect(b.coverPath) { colors = vm.artColors(b.coverPath) }
+    LaunchedEffect(id) { vm.loadAccent(id) }
     LaunchedEffect(id) { if (vm.hub.state.value.bookId != id) vm.play(id, autoplay = false) }
     val shown = if (state.bookId == id) state else state.copy(positionMs = b.positionMs, durationMs = b.durationMs, playing = false, speed = b.speed)
     PlayerContent(
-        b, shown, chapters, mode, strength, colors, history.map { it.positionMs },
+        b, shown, chapters, mode, strength, colors, accentOverride, history.map { it.positionMs },
         PlayerActions(
             onBack = { nav.popBackStack() },
             onSeries = { b.series?.let { nav.navigate("series/${Uri.encode(it)}") } },
@@ -175,6 +177,7 @@ private fun PlayerRoute(vm: AppViewModel, nav: NavHostController, id: Long) {
             onBookmark = { vm.addBookmark(id, shown.positionMs) },
             onMode = vm::setBackground,
             onStrength = vm::setStrength,
+            onAccent = { vm.setAccent(id, it) },
         ),
     )
 }

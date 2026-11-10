@@ -2,7 +2,10 @@ package io.github.m0n0t0ne0ne.colophon.ui
 
 import android.os.Build
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
@@ -18,6 +21,8 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -60,6 +65,7 @@ data class PlayerActions(
     val onBookmark: () -> Unit = {},
     val onMode: (BackgroundMode) -> Unit = {},
     val onStrength: (Float) -> Unit = {},
+    val onAccent: (Color?) -> Unit = {},
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -71,6 +77,7 @@ fun PlayerContent(
     mode: BackgroundMode,
     strength: Float,
     colors: ArtColors,
+    accentChoice: Color?,
     jumps: List<Long>,
     actions: PlayerActions,
 ) {
@@ -88,7 +95,8 @@ fun PlayerContent(
     val chapterEnd = chapters.getOrNull(index + 1)?.startMs ?: duration
     val chapterLength = (chapterEnd - chapterStart).coerceAtLeast(1)
     val inChapter = (position - chapterStart).coerceIn(0, chapterLength)
-    val accent = if (mode == BackgroundMode.Black) C.Accent else colors.accent
+    val autoAccent = if (mode == BackgroundMode.Black) C.Accent else colors.accent
+    val accent = accentChoice ?: autoAccent
 
     Box(Modifier.fillMaxSize().background(C.Ground)) {
         Backdrop(book, mode, strength, colors)
@@ -200,6 +208,16 @@ fun PlayerContent(
                     }
                     Slider(strength, actions.onStrength, colors = SliderDefaults.colors(thumbColor = OnArt, activeTrackColor = OnArt, inactiveTrackColor = C.Border))
                 }
+                Text("Progress colour", style = Small, modifier = Modifier.padding(top = 4.dp))
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    ColorDot(autoAccent, selected = accentChoice == null, label = "A") { actions.onAccent(null) }
+                    colors.swatches.forEach { c ->
+                        ColorDot(c, selected = accentChoice?.toArgb() == c.toArgb()) { actions.onAccent(c) }
+                    }
+                }
             }
             "sleep" -> Sheet("Sleep timer", { sheet = null }) {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -224,6 +242,26 @@ fun PlayerContent(
                 if (state.sleepLeftMs != null) SecondaryButton("Turn off", Modifier.fillMaxWidth()) { actions.onSleep(null); sheet = null }
             }
         }
+    }
+}
+
+@Composable
+private fun ColorDot(color: Color, selected: Boolean, label: String? = null, onClick: () -> Unit) {
+    val ink = if (color.luminance() > 0.5f) Color.Black.copy(alpha = 0.6f) else OnArt
+    Box(
+        Modifier
+            .size(36.dp)
+            .clip(CircleShape)
+            .background(color)
+            .border(
+                width = if (selected) 2.5.dp else 1.dp,
+                color = if (selected) OnArt else OnArt.copy(alpha = 0.28f),
+                shape = CircleShape,
+            )
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (label != null) Text(label, style = Tiny.copy(color = ink, fontWeight = FontWeight.Bold))
     }
 }
 
