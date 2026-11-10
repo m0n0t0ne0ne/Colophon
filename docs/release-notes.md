@@ -1,4 +1,4 @@
-Lets the analyzer read scene titles announced by number.
+Opens a tapped book paused, and keeps "Chapter" out of unspoken titles.
 
-- When the narrator says just a number, pauses, then the scene name ("Two… Death Cookie"), the analyzer now captures the name instead of only the number.
-- Ordinary numbers in narration are left alone.
+- Tapping a book now opens the player without starting playback — you press play.
+- When the analyzer reads a scene announced only by number, it labels it with the number alone, not "Chapter N".

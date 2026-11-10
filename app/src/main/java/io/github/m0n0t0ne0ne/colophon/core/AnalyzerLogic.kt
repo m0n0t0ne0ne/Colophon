@@ -145,7 +145,8 @@ object TitleExtractor {
         parseNumber(lower)?.let { (number, used) ->
             if (used < words.size && words[used].startSec - words[used - 1].endSec >= NUMBER_HEADING_GAP) {
                 val name = phraseAfter(words, used)
-                if (name.isNotBlank()) return Heading(SectionKind.CHAPTER, number, "Chapter $number", name, null)
+                // The narrator didn't say "Chapter", so label it with the number alone.
+                if (name.isNotBlank()) return Heading(SectionKind.CHAPTER, number, "$number", name, null)
             }
         }
         return null

@@ -53,6 +53,7 @@ class TranscriptTest {
         assertEquals(SectionKind.CHAPTER, h.kind)
         assertEquals(2, h.number)
         assertEquals("Death Cookie", h.name)
+        assertEquals("2", h.label) // no spoken "Chapter", so just the number
     }
 
     @Test fun aNumberInsideNarrationIsNotAChapter() {

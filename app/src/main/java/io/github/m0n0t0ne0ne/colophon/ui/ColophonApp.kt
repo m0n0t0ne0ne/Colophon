@@ -90,7 +90,7 @@ fun ColophonApp(vm: AppViewModel) {
                     val name = Uri.decode(e.arguments?.getString("name").orEmpty())
                     SeriesContent(
                         name, books.filter { it.series == name }, { nav.popBackStack() },
-                        { b -> vm.play(b.id); nav.navigate("player/${b.id}") },
+                        { b -> vm.play(b.id, autoplay = false); nav.navigate("player/${b.id}") },
                         { b -> nav.navigate("details/${b.id}") },
                         { b -> vm.removeBook(b.id) },
                         { vm.removeSeries(name); nav.popBackStack() },
@@ -134,7 +134,7 @@ private fun LibraryRoute(vm: AppViewModel, nav: NavHostController, tab: Int) {
     val files = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris -> if (uris.isNotEmpty()) vm.importFiles(uris) }
     LibraryContent(
         books, tab, importing,
-        { b -> vm.play(b.id); nav.navigate("player/${b.id}") },
+        { b -> vm.play(b.id, autoplay = false); nav.navigate("player/${b.id}") },
         { s -> nav.navigate("series/${Uri.encode(s)}") },
         { folder.launch(null) },
         { files.launch(arrayOf("audio/*", "video/mp4", "application/octet-stream")) },
