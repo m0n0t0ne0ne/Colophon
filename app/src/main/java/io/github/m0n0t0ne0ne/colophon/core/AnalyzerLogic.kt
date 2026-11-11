@@ -161,8 +161,11 @@ object TitleExtractor {
         }
 
         // Some books (numbered scenes) announce just the number, then pause, then the scene name:
-        // "Two. Death Cookie". The pause after the number separates it from ordinary narration.
-        parseNumber(lower)?.let { (number, used) ->
+        // "Two. Death Cookie". The pause after the number separates it from ordinary narration. A
+        // single filler word may precede the number ("…to Nine. Defeat of Miriam"), so try that too.
+        val numFrom = if (lower.firstOrNull() in FILLER) 1 else 0
+        parseNumber(lower.drop(numFrom))?.let { (number, usedRel) ->
+            val used = usedRel + numFrom
             if (used < words.size && words[used].startSec - words[used - 1].endSec >= NUMBER_HEADING_GAP) {
                 val name = phraseAfter(words, used)
                 // The narrator didn't say "Chapter", so label it with the number alone.

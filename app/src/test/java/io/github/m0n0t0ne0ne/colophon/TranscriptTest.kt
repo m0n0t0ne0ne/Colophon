@@ -118,6 +118,17 @@ class TranscriptTest {
         assertNull(HeadingLocator.relocate(words))
     }
 
+    @Test fun fillerWordBeforeASpokenNumberStillBecomesAChapter() {
+        // "…to Nine. Defeat of Miriam" — a stray "to" precedes the spoken number.
+        val h = TitleExtractor.extract(timed(
+            "to" to 0.0, "nine" to 0.05, "defeat" to 0.8, "of" to 0.05, "miriam" to 0.05, "the" to 0.8,
+        ))!!
+        assertEquals(SectionKind.CHAPTER, h.kind)
+        assertEquals(9, h.number)
+        assertEquals("9", h.label)
+        assertEquals("Defeat of Miriam", h.name)
+    }
+
     @Test fun overlappingScanSegmentsJoinPauses() {
         val merged = PauseMerger.merge(listOf(Pause(10_000, 12_000), Pause(11_000, 13_000), Pause(50_000, 52_000)))
         assertEquals(listOf(Pause(10_000, 13_000), Pause(50_000, 52_000)), merged)
