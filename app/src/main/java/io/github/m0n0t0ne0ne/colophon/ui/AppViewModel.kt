@@ -122,11 +122,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
         }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    fun importFolder(uri: Uri) = runImport { Importer(context, dao, removedFiles()).importFolder(uri) }
-    fun importFiles(uris: List<Uri>) = runImport { Importer(context, dao, removedFiles()).importFiles(uris) }
+    // Picking a folder or files is a deliberate request to add them, so it ignores the "removed"
+    // memory (otherwise a book removed earlier can never be added back) and then forgets any of those
+    // files that are now in the library. Only the background refresh keeps honouring removals.
+    fun importFolder(uri: Uri) = runImport { Importer(context, dao).importFolder(uri).also { forgetReturnedRemovals() } }
+    fun importFiles(uris: List<Uri>) = runImport { Importer(context, dao).importFiles(uris).also { forgetReturnedRemovals() } }
     fun refreshLibrary() = runImport { Importer(context, dao, removedFiles()).refresh() }
 
     private fun removedFiles(): Set<String> = prefs.getStringSet("removedFiles", emptySet()).orEmpty()
+
+    /** Drops files that are back in the library from the removed-memory so a later refresh keeps them. */
+    private suspend fun forgetReturnedRemovals() {
+        val present = dao.allFiles().map { Importer.fileKey(it.uri) }.toSet()
+        val remembered = removedFiles()
+        val pruned = remembered - present
+        if (pruned.size != remembered.size) prefs.edit().putStringSet("removedFiles", pruned).apply()
+    }
 
     private fun runImport(block: suspend () -> ImportResult) {
         if (importing.value) return
