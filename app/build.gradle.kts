@@ -13,8 +13,8 @@ android {
         applicationId = "io.github.m0n0t0ne0ne.colophon"
         minSdk = 26
         targetSdk = 35
-        versionCode = 40
-        versionName = "0.9.21"
+        versionCode = 41
+        versionName = "0.9.22"
         ndk { abiFilters += ((project.findProperty("colophon.abis") as String?) ?: "arm64-v8a").split(",") }
     }
 

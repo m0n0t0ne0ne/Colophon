@@ -69,7 +69,9 @@ object TitleExtractor {
     )
     private val ordinals = mapOf(
         "first" to 1, "second" to 2, "third" to 3, "fourth" to 4, "fifth" to 5, "sixth" to 6,
-        "seventh" to 7, "eighth" to 8, "ninth" to 9, "tenth" to 10,
+        "seventh" to 7, "eighth" to 8, "ninth" to 9, "tenth" to 10, "eleventh" to 11, "twelfth" to 12,
+        "thirteenth" to 13, "fourteenth" to 14, "fifteenth" to 15, "sixteenth" to 16, "seventeenth" to 17,
+        "eighteenth" to 18, "nineteenth" to 19, "twentieth" to 20,
     )
     private val named = listOf(
         listOf("prologue") to (SectionKind.PROLOGUE to "Prologue"),
@@ -88,16 +90,29 @@ object TitleExtractor {
         listOf("author's", "note") to (SectionKind.OTHER to "Author's Note"),
         listOf("glossary") to (SectionKind.OTHER to "Glossary"),
     )
+    // Named sections (prologue, foreword, …) are announced right at the top, so keep their scan tight.
     private const val HEADING_WINDOW = 5
+    // "Chapter / Part / Book N" must still be near the break, but the speech model often drops a filler
+    // token first ("and chapter one…"), so scan a little deeper and flag anything heard mid-sentence.
+    private const val KEYWORD_WINDOW = 10
+    // Words that may sit before a heading without disqualifying it (model artefacts or a lead-in breath).
+    private val FILLER = setOf(
+        "a", "an", "and", "the", "of", "to", "in", "on", "at", "but", "so", "now", "then",
+        "well", "oh", "um", "uh", "er", "as", "we", "i", "he", "she", "it", "that", "this", "there",
+    )
     private const val TITLE_GAP_SEC = 0.55
     private const val MAX_TITLE_WORDS = 8
     // A spoken chapter number is followed by a deliberate pause before the scene name.
     private const val NUMBER_HEADING_GAP = 0.4
 
-    fun parseNumber(words: List<String>): Pair<Int, Int>? {
+    fun parseNumber(all: List<String>): Pair<Int, Int>? {
+        if (all.isEmpty()) return null
+        // Allow an article before the number, as in the archaic "Chapter the First".
+        val skip = if (all[0] == "the" && all.size > 1) 1 else 0
+        val words = all.drop(skip)
         if (words.isEmpty()) return null
-        words[0].toIntOrNull()?.let { return it to 1 }
-        ordinals[words[0]]?.let { return it to 1 }
+        words[0].toIntOrNull()?.let { return it to (1 + skip) }
+        ordinals[words[0]]?.let { return it to (1 + skip) }
         var i = 0
         var value = 0
         var used = false
@@ -110,7 +125,7 @@ object TitleExtractor {
         tens[words.getOrNull(i)]?.let { value += it; i++; used = true }
         val unit = units[words.getOrNull(i)]
         if (unit != null && (unit < 10 || value % 100 == 0)) { value += unit; i++; used = true }
-        return if (used) value to i else null
+        return if (used) value to (i + skip) else null
     }
 
     fun extract(words: List<Word>): Heading? {
@@ -128,11 +143,16 @@ object TitleExtractor {
 
         for ((keyword, kind, label) in listOf(
             Triple("chapter", SectionKind.CHAPTER, "Chapter"),
+            Triple("chapters", SectionKind.CHAPTER, "Chapter"),
             Triple("part", SectionKind.PART, "Part"),
             Triple("book", SectionKind.PART, "Book"),
         )) {
             val at = lower.indexOf(keyword)
-            if (at !in 0 until HEADING_WINDOW) continue
+            if (at !in 0 until KEYWORD_WINDOW) continue
+            // Past the tight window, only accept the heading when every word before it is filler the
+            // speech model may have prepended (an article, conjunction or discourse word). That lets a
+            // dropped "and"/"the" through without mistaking "…to the river chapter three" for a heading.
+            if (at >= HEADING_WINDOW && !lower.subList(0, at).all { it in FILLER }) continue
             val parsed = parseNumber(lower.drop(at + 1)) ?: continue
             val (number, used) = parsed
             val rest = titleAfter(words, at + 1 + used)
@@ -174,7 +194,9 @@ object TitleExtractor {
     /** The narrator normally pauses after a title, so the title ends at the first real gap. */
     private fun titleAfter(words: List<Word>, from: Int): String {
         if (from >= words.size) return ""
-        if (words[from].startSec - words[from - 1].endSec > 2.0) return ""
+        // The narrator often leaves a deliberate pause between "Chapter One" and the title line; allow
+        // a generous gap before giving up, but not so long that we pull in the chapter's first sentence.
+        if (words[from].startSec - words[from - 1].endSec > 3.5) return ""
         val out = mutableListOf(words[from].text)
         var i = from + 1
         var sawGap = false

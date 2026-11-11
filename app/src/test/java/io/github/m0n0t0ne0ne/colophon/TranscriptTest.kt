@@ -61,6 +61,41 @@ class TranscriptTest {
         assertNull(TitleExtractor.extract(timed("two" to 0.0, "men" to 0.05, "walked" to 0.05, "in" to 0.05)))
     }
 
+    @Test fun chapterKeepsTitleAcrossADeliberatePauseBeforeIt() {
+        // "Chapter One. [long pause] The Early Married Life of the Morels." (Sons and Lovers)
+        val h = TitleExtractor.extract(timed(
+            "chapter" to 0.0, "one" to 0.3, "the" to 2.6, "early" to 0.05, "married" to 0.05,
+            "life" to 0.05, "of" to 0.05, "the" to 0.05, "morels" to 0.05, "when" to 0.8,
+        ))!!
+        assertEquals(SectionKind.CHAPTER, h.kind)
+        assertEquals(1, h.number)
+        assertEquals("Chapter 1", h.label)
+        assertEquals("The Early Married Life of the Morels", h.name)
+    }
+
+    @Test fun headingAfterFillerWordsIsStillFound() {
+        // Model artefacts prepended filler, pushing "chapter" past the tight 5-word window; every word
+        // before it is filler, so the heading is still found (and flagged as heard mid-sentence).
+        val h = TitleExtractor.extract(spoken("well and so then the chapter eleven strife in love"))!!
+        assertEquals(11, h.number)
+        assertEquals("Chapter 11", h.label)
+        assertEquals("\"Chapter\" heard mid-sentence?", h.reason)
+    }
+
+    @Test fun contentWordsBeforeKeywordAreNotAHeading() {
+        // "…walked to the river chapter three" is narration — content words precede the keyword.
+        assertNull(TitleExtractor.extract(spoken("he walked to the river chapter three began")))
+    }
+
+    @Test fun archaicChapterTheFirstParses() {
+        val h = TitleExtractor.extract(timed(
+            "chapter" to 0.0, "the" to 0.3, "first" to 0.3, "the" to 1.0, "early" to 0.05, "years" to 0.05, "it" to 0.8,
+        ))!!
+        assertEquals(1, h.number)
+        assertEquals("Chapter 1", h.label)
+        assertEquals("The Early Years", h.name)
+    }
+
     @Test fun overlappingScanSegmentsJoinPauses() {
         val merged = PauseMerger.merge(listOf(Pause(10_000, 12_000), Pause(11_000, 13_000), Pause(50_000, 52_000)))
         assertEquals(listOf(Pause(10_000, 13_000), Pause(50_000, 52_000)), merged)
