@@ -217,6 +217,30 @@ object TitleExtractor {
     }.joinToString(" ")
 }
 
+object HeadingLocator {
+    private const val MIN_GAP_SEC = 2.0
+
+    /**
+     * When a chapter mark sits a few seconds early — in the tail of the previous chapter — the
+     * transcribed window reads as "…previous-chapter tail [long pause] Chapter Two…". This finds that
+     * deliberate pause and checks a heading is spoken right after it, so the mark can be snapped onto
+     * the heading instead of the tail. Returns the pause-end offset (seconds into the window) and the
+     * heading found there, or null to keep the mark where it is.
+     */
+    fun relocate(words: List<Word>): Pair<Double, Heading>? {
+        if (words.size < 2) return null
+        var bestIdx = -1
+        var bestGap = MIN_GAP_SEC
+        for (i in 1 until words.size) {
+            val gap = words[i].startSec - words[i - 1].endSec
+            if (gap >= bestGap) { bestGap = gap; bestIdx = i }
+        }
+        if (bestIdx < 0) return null
+        val heading = TitleExtractor.extract(words.subList(bestIdx, words.size)) ?: return null
+        return words[bestIdx].startSec to heading
+    }
+}
+
 data class Candidate(
     val startMs: Long,
     val pauseMs: Long,

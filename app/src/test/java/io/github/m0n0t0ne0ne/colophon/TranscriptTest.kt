@@ -96,6 +96,28 @@ class TranscriptTest {
         assertEquals("The Early Years", h.name)
     }
 
+    @Test fun relocatesAnEarlyMarkOntoTheHeadingAfterThePause() {
+        // "…and she was gone. [long pause] Chapter Two. The Trial of Paul." — the mark landed in the
+        // previous chapter's tail, so the heading sits after the inter-chapter pause.
+        val words = timed(
+            "and" to 0.0, "she" to 0.05, "was" to 0.05, "gone" to 0.05,
+            "chapter" to 2.6, "two" to 0.3, "the" to 1.0, "trial" to 0.05, "of" to 0.05, "paul" to 0.05, "when" to 0.8,
+        )
+        val (offset, heading) = HeadingLocator.relocate(words)!!
+        assertEquals(2, heading.number)
+        assertEquals("Chapter 2", heading.label)
+        assertEquals("The Trial of Paul", heading.name)
+        assertEquals(3.95, offset, 0.001) // snaps to the first word after the pause
+    }
+
+    @Test fun doesNotRelocateToAPauseWithNoHeadingAfterIt() {
+        val words = timed(
+            "chapter" to 0.0, "two" to 0.3, "the" to 0.5, "trial" to 0.05, "began" to 0.05, "slowly" to 0.05,
+            "the" to 2.2, "rain" to 0.05, "fell" to 0.05,
+        )
+        assertNull(HeadingLocator.relocate(words))
+    }
+
     @Test fun overlappingScanSegmentsJoinPauses() {
         val merged = PauseMerger.merge(listOf(Pause(10_000, 12_000), Pause(11_000, 13_000), Pause(50_000, 52_000)))
         assertEquals(listOf(Pause(10_000, 13_000), Pause(50_000, 52_000)), merged)

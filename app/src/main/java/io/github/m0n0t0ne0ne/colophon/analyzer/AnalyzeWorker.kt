@@ -165,10 +165,16 @@ class AnalyzeWorker(context: Context, params: WorkerParameters) : CoroutineWorke
                     while (!isStopped) {
                         val target = targets.getOrNull(next.getAndIncrement()) ?: break
                         val words = transcribe(model, files, target.ms)
+                        val baseStart = (target.ms - if (target.pauseMs > 0) 300 else 0).coerceAtLeast(0)
+                        // A heading heard right at the mark is trusted as-is. Otherwise, if the window is
+                        // the previous chapter's tail followed by a pause and a heading (an embedded mark
+                        // placed a few seconds early), snap the start onto that heading.
+                        val direct = TitleExtractor.extract(words)
+                        val reloc = if (direct == null) HeadingLocator.relocate(words) else null
                         val candidate = Candidate(
-                            startMs = (target.ms - if (target.pauseMs > 0) 300 else 0).coerceAtLeast(0),
+                            startMs = reloc?.let { (target.ms + (it.first * 1000).toLong() - 300).coerceAtLeast(0) } ?: baseStart,
                             pauseMs = target.pauseMs,
-                            heading = TitleExtractor.extract(words),
+                            heading = direct ?: reloc?.second,
                             firstWords = words.take(5).joinToString(" ") { it.text },
                             fallbackTitle = target.fallbackTitle,
                         )
