@@ -39,6 +39,9 @@ private const val SEGMENT_MS = 600_000L
 private const val SEGMENT_OVERLAP_MS = 3_000L
 private const val MIN_MARKERS = 3
 private const val MAX_MARKER_SPACING_MS = 45 * 60_000L
+// A file with this many embedded chapters clearly has a real chapter list, even if the chapters are
+// long (classic novels run well over 45 min each), so trust it as the skeleton regardless of spacing.
+private const val MARKER_COUNT_TRUST = 8
 private const val SAMPLE_RATE = 16_000
 private const val CHANNEL = "analysis"
 
@@ -74,7 +77,12 @@ class AnalyzeWorker(context: Context, params: WorkerParameters) : CoroutineWorke
             val total = files.sumOf { it.durationMs }.coerceAtLeast(1)
             val markers = dao.chapters(bookId, ChapterSet.ORIGINAL)
             val spacing = if (markers.size > 1) total / markers.size else Long.MAX_VALUE
-            val useMarkers = !inputData.getBoolean(KEY_FULL, false) && markers.size >= MIN_MARKERS && spacing <= MAX_MARKER_SPACING_MS
+            // Hybrid: use the file's own chapter list as the skeleton (so no chapter is ever missed),
+            // then the transcription step listens near each mark to snap it onto the spoken heading and
+            // read the real title. Only a Full scan, or a file with too few/too coarse markers, listens
+            // from scratch instead.
+            val useMarkers = !inputData.getBoolean(KEY_FULL, false) && markers.size >= MIN_MARKERS &&
+                (markers.size >= MARKER_COUNT_TRUST || spacing <= MAX_MARKER_SPACING_MS)
             val workers = Runtime.getRuntime().availableProcessors().coerceIn(2, 4)
 
             val targets: List<Target> = if (useMarkers) {
