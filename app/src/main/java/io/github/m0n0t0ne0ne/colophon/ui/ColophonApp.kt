@@ -2,7 +2,6 @@ package io.github.m0n0t0ne0ne.colophon.ui
 
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -246,14 +245,17 @@ private fun DetailsRoute(vm: AppViewModel, nav: NavHostController, id: Long) {
     val book by remember(id) { vm.bookFlow(id) }.collectAsStateWithLifecycle(null)
     val b: Book = book ?: return
     var pending by remember { mutableStateOf<((String?) -> Unit)?>(null) }
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+    // The document picker (Storage Access Framework) lets the cover come from anywhere the phone can
+    // reach — gallery, Downloads, the SD card, the audiobook's own folder, or a cloud provider — rather
+    // than only the photo picker's gallery media.
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         val done = pending
         if (uri != null && done != null) vm.copyCover(uri, id, done)
     }
     key(b.id) {
         DetailsScreen(
             b, { nav.popBackStack() },
-            { done -> pending = done; picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+            { done -> pending = done; picker.launch(arrayOf("image/*")) },
             { updated, whole -> vm.saveBook(updated, whole); nav.popBackStack() },
             { vm.removeBook(id); nav.go("library") },
             { nav.navigate("tags/$id") },
