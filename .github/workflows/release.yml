@@ -56,7 +56,6 @@ jobs:
             echo "::error::Add the COLOPHON_KEYSTORE_B64 and COLOPHON_KEYSTORE_PASSWORD repository secrets."
             exit 1
           fi
-          scripts/fetch-assets.sh
           echo "$KEYSTORE_B64" | tr -d '[:space:]' | base64 -d > "$RUNNER_TEMP/release.jks"
           export COLOPHON_KEYSTORE="$RUNNER_TEMP/release.jks"
           export COLOPHON_KEYSTORE_PASSWORD="$KEYSTORE_PASSWORD"
