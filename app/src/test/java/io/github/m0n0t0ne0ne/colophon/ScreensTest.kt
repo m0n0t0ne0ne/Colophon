@@ -90,28 +90,12 @@ class ScreensTest {
     @Test fun playerBlack() = player(BackgroundMode.Black, "player-black")
 
     @Test fun chaptersScreen() {
-        rule.setContent { ColophonTheme { ChaptersContent(chapters, chapters, emptyList(), 13 * hours, false, {}, {}, {}, {}, {}, {}, {}, {}, {}) } }
+        rule.setContent { ColophonTheme { ChaptersContent(chapters, chapters, emptyList(), 13 * hours, {}, {}, {}, {}, {}, {}, {}) } }
         shoot("chapters")
-    }
-
-    @Test fun reviewScreen() {
-        val list = chapters.mapIndexed { i, c -> if (i in setOf(0, 4, 8)) c.copy(reason = listOf("Likely opening credits", "", "", "", "Spelling looks unusual", "", "", "", "Chapter 7 title was not heard")[i]) else c }
-        rule.setContent { ColophonTheme { ReviewContent(list, {}, {}, {}, {}, {}, {}) } }
-        shoot("review")
     }
 
     @Test fun editorScreen() {
         rule.setContent { ColophonTheme { EditorContent(chapters[6], 30 * hours, {}, {}, {}, {}, {}) } }
         shoot("editor")
-    }
-
-    @Test fun analyzerScreen() {
-        val books = sampleBooks()
-        rule.setContent {
-            ColophonTheme {
-                AnalyzerContent(books.take(5), listOf(AnalysisRun(3, androidx.work.WorkInfo.State.RUNNING, 3, 62, "Transcribing 44 of 71")), listOf(2L), true, {}, {}, {}, {}, {})
-            }
-        }
-        shoot("analyzer")
     }
 }

@@ -12,13 +12,9 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.asFlow
 import androidx.lifecycle.viewModelScope
 import androidx.palette.graphics.Palette
-import androidx.work.WorkInfo
-import androidx.work.WorkManager
 import io.github.m0n0t0ne0ne.colophon.ColophonApplication
-import io.github.m0n0t0ne0ne.colophon.analyzer.AnalyzeWorker
 import io.github.m0n0t0ne0ne.colophon.data.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
@@ -33,8 +29,6 @@ data class ArtColors(
     val swatchesSoft: List<Color> = emptyList(),
     val swatchesVivid: List<Color> = emptyList(),
 )
-
-data class AnalysisRun(val bookId: Long, val state: WorkInfo.State, val stage: Int, val percent: Int, val detail: String)
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val context: Context get() = getApplication()
@@ -88,7 +82,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun shakeExtendMs(): Long = if (sleepShake.value) sleepShakeMin.value * 60_000L else 0L
-    val reviews: StateFlow<List<Long>> = dao.booksWithSuggestions().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val message = MutableStateFlow<String?>(null)
     val importing = MutableStateFlow(false)
@@ -99,28 +92,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         runCatching { BackgroundMode.valueOf(prefs.getString("bg", "Art")!!) }.getOrDefault(BackgroundMode.Art),
     )
     val backgroundStrength = MutableStateFlow(prefs.getFloat("bgStrength", 0.6f))
-    val onlyCharging = MutableStateFlow(prefs.getBoolean("charging", true))
-    val fullScan = MutableStateFlow(prefs.getBoolean("fullScan", false))
     val resumeRewindSec = MutableStateFlow(prefs.getInt("resumeRewindSec", 15))
     val sleepChime = MutableStateFlow(prefs.getBoolean("sleepChime", true))
     val sleepShake = MutableStateFlow(prefs.getBoolean("sleepShake", false))
     val sleepShakeMin = MutableStateFlow(prefs.getInt("sleepShakeMin", 5))
     val sleepSound = MutableStateFlow(Chime.from(prefs.getString("sleepSound", null)))
     val sleepVolume = MutableStateFlow(prefs.getInt("sleepVolume", 85))
-
-    val analysis: StateFlow<List<AnalysisRun>> = WorkManager.getInstance(app)
-        .getWorkInfosByTagLiveData(AnalyzeWorker.TAG).asFlow()
-        .map { infos ->
-            infos.filter { it.state == WorkInfo.State.RUNNING || it.state == WorkInfo.State.ENQUEUED || it.state == WorkInfo.State.FAILED }.mapNotNull { w ->
-                val id = w.tags.firstOrNull { it.startsWith("book-") }?.removePrefix("book-")?.toLongOrNull() ?: return@mapNotNull null
-                AnalysisRun(
-                    id, w.state,
-                    w.progress.getInt(AnalyzeWorker.KEY_STAGE, 1),
-                    w.progress.getInt(AnalyzeWorker.KEY_PERCENT, 0),
-                    w.progress.getString(AnalyzeWorker.KEY_DETAIL) ?: w.outputData.getString(AnalyzeWorker.KEY_DETAIL) ?: "",
-                )
-            }
-        }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     // Picking a folder or files is a deliberate request to add them, so it ignores the "removed"
     // memory (otherwise a book removed earlier can never be added back) and then forgets any of those
@@ -185,24 +162,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         backgroundStrength.value = value
         prefs.edit().putFloat("bgStrength", value).apply()
     }
-
-    fun setOnlyCharging(value: Boolean) {
-        onlyCharging.value = value
-        prefs.edit().putBoolean("charging", value).apply()
-    }
-
-    fun setFullScan(value: Boolean) {
-        fullScan.value = value
-        prefs.edit().putBoolean("fullScan", value).apply()
-    }
-
-    fun analyze(bookId: Long) = AnalyzeWorker.enqueue(context, bookId, onlyCharging.value, fullScan.value)
-
-    fun cancelAnalysis(bookId: Long) {
-        WorkManager.getInstance(context).cancelUniqueWork("analyze-$bookId")
-    }
-
-    fun clearFailedRuns() { WorkManager.getInstance(context).pruneWork() }
 
     fun bookFlow(id: Long) = dao.bookFlow(id)
     fun chapters(id: Long, set: String) = dao.chaptersFlow(id, set)
@@ -312,25 +271,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun setAnalyzed(bookId: Long, analyzed: Boolean) {
-        viewModelScope.launch { dao.setAnalyzedAt(bookId, if (analyzed) System.currentTimeMillis() else 0) }
-    }
-
     fun resetChapters(bookId: Long) {
         viewModelScope.launch { dao.replaceSet(bookId, ChapterSet.CURRENT, dao.chapters(bookId, ChapterSet.ORIGINAL)) }
     }
-
-    fun acceptSuggestions(bookId: Long) {
-        viewModelScope.launch {
-            val list = dao.chapters(bookId, ChapterSet.SUGGESTED).map { it.copy(reason = null) }
-            dao.replaceSet(bookId, ChapterSet.CURRENT, list)
-            dao.clearSet(bookId, ChapterSet.SUGGESTED)
-            dao.book(bookId)?.let { dao.update(it.copy(analyzedAt = System.currentTimeMillis())) }
-            message.value = "Chapters saved. Your original file is unchanged."
-        }
-    }
-
-    fun discardSuggestions(bookId: Long) { viewModelScope.launch { dao.clearSet(bookId, ChapterSet.SUGGESTED) } }
 
     fun saveBook(book: Book, coverForSeries: Boolean) {
         viewModelScope.launch {
@@ -357,7 +300,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private suspend fun removeBookNow(bookId: Long) {
         hub.forget(bookId)
-        cancelAnalysis(bookId)
         val cover = dao.book(bookId)?.coverPath
         // Remembered so a refresh doesn't bring back a book you removed on purpose.
         val keys = dao.files(bookId).map { Importer.fileKey(it.uri) }

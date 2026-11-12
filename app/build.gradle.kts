@@ -13,8 +13,8 @@ android {
         applicationId = "io.github.m0n0t0ne0ne.colophon"
         minSdk = 26
         targetSdk = 35
-        versionCode = 47
-        versionName = "0.9.28"
+        versionCode = 48
+        versionName = "0.9.29"
         ndk { abiFilters += ((project.findProperty("colophon.abis") as String?) ?: "arm64-v8a").split(",") }
     }
 
@@ -69,15 +69,12 @@ dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.palette:palette-ktx:1.0.0")
     implementation("androidx.documentfile:documentfile:1.0.1")
-    implementation("androidx.work:work-runtime-ktx:2.10.0")
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
     ksp("androidx.room:room-compiler:2.6.1")
     implementation("androidx.media3:media3-exoplayer:1.5.1")
     implementation("androidx.media3:media3-session:1.5.1")
     implementation("io.coil-kt:coil-compose:2.7.0")
-    implementation("com.alphacephei:vosk-android:0.3.75") { exclude(group = "net.java.dev.jna") }
-    implementation("net.java.dev.jna:jna:5.18.1@aar")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.14.1")

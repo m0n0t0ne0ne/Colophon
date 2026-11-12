@@ -52,7 +52,6 @@ fun ColophonApp(vm: AppViewModel) {
         route == "library" -> Tab.Library
         route == "seriesList" || route?.startsWith("series/") == true -> Tab.Series
         route == "booksList" -> Tab.Books
-        route == "analyzer" -> Tab.Analyzer
         else -> null
     }
 
@@ -65,7 +64,6 @@ fun ColophonApp(vm: AppViewModel) {
                     Tab.Library -> nav.go("library")
                     Tab.Books -> nav.go("booksList")
                     Tab.Series -> nav.go("seriesList")
-                    Tab.Analyzer -> nav.go("analyzer")
                     Tab.Playing -> {
                         val id = player.bookId ?: books.filter { it.lastPlayedAt > 0 }.maxByOrNull { it.lastPlayedAt }?.id
                         if (id != null) {
@@ -97,17 +95,6 @@ fun ColophonApp(vm: AppViewModel) {
                 }
                 composable("player/{id}", listOf(idArg())) { e -> PlayerRoute(vm, nav, e.id()) }
                 composable("chapters/{id}", listOf(idArg())) { e -> ChaptersRoute(vm, nav, e.id()) }
-                composable("analyzer") {
-                    val runs by vm.analysis.collectAsStateWithLifecycle()
-                    val reviews by vm.reviews.collectAsStateWithLifecycle()
-                    val charging by vm.onlyCharging.collectAsStateWithLifecycle()
-                    val full by vm.fullScan.collectAsStateWithLifecycle()
-                    AnalyzerContent(
-                        books, runs, reviews, charging, vm::setOnlyCharging, vm::analyze, vm::cancelAnalysis,
-                        { nav.navigate("review/$it") }, vm::clearFailedRuns, full, vm::setFullScan, vm::setAnalyzed,
-                    )
-                }
-                composable("review/{id}", listOf(idArg())) { e -> ReviewRoute(vm, nav, e.id()) }
                 composable("editor/{id}", listOf(idArg())) { e -> EditorRoute(vm, nav, e.id()) }
                 composable("details/{id}", listOf(idArg())) { e -> DetailsRoute(vm, nav, e.id()) }
                 composable("tags/{id}", listOf(idArg())) { e -> TagsRoute(vm, nav, e.id()) }
@@ -186,34 +173,15 @@ private fun ChaptersRoute(vm: AppViewModel, nav: NavHostController, id: Long) {
     val current by remember(id) { vm.chapters(id, ChapterSet.CURRENT) }.collectAsStateWithLifecycle(emptyList())
     val original by remember(id) { vm.chapters(id, ChapterSet.ORIGINAL) }.collectAsStateWithLifecycle(emptyList())
     val marks by remember(id) { vm.bookmarks(id) }.collectAsStateWithLifecycle(emptyList())
-    val reviews by vm.reviews.collectAsStateWithLifecycle()
     val state by vm.hub.state.collectAsStateWithLifecycle()
     ChaptersContent(
-        current, original, marks, state.positionMs, id in reviews, { nav.popBackStack() },
+        current, original, marks, state.positionMs, { nav.popBackStack() },
         { at -> vm.play(id, true, at); nav.popBackStack() },
         { c -> nav.navigate("editor/${c.id}") },
-        { vm.analyze(id); nav.go("analyzer") },
-        { nav.navigate("review/$id") },
         { vm.addChapter(id, ChapterSet.CURRENT, state.positionMs) },
         { vm.resetChapters(id) },
         { w -> vm.padChapterNumbers(id, w) },
         vm::deleteBookmark,
-    )
-}
-
-@Composable
-private fun ReviewRoute(vm: AppViewModel, nav: NavHostController, id: Long) {
-    val chapters by remember(id) { vm.chapters(id, ChapterSet.SUGGESTED) }.collectAsStateWithLifecycle(emptyList())
-    val previewing by vm.previewing.collectAsStateWithLifecycle()
-    DisposableEffect(id) { onDispose { vm.stopPreview() } }
-    ReviewContent(
-        chapters, { nav.popBackStack() },
-        { at -> vm.startPreview(id, at) },
-        { c -> nav.navigate("editor/${c.id}") },
-        { c -> vm.saveChapter(c.copy(reason = null)) },
-        { vm.acceptSuggestions(id); nav.popBackStack() },
-        { vm.discardSuggestions(id); nav.popBackStack() },
-        previewing, vm::stopPreview,
     )
 }
 

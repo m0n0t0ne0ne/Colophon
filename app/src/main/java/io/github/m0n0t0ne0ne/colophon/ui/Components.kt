@@ -189,7 +189,7 @@ fun HeaderRow(title: String, onBack: (() -> Unit)?, actions: @Composable RowScop
     }
 }
 
-enum class Tab(val label: String) { Library("Library"), Books("Books"), Series("Series"), Playing("Playing"), Analyzer("Analyzer") }
+enum class Tab(val label: String) { Library("Library"), Books("Books"), Series("Series"), Playing("Playing") }
 
 @Composable
 fun BottomBar(current: Tab?, onSelect: (Tab) -> Unit) {
@@ -203,7 +203,7 @@ fun BottomBar(current: Tab?, onSelect: (Tab) -> Unit) {
                     horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
                 ) {
                     Icon(
-                        when (tab) { Tab.Library -> Ic.Library; Tab.Books -> Ic.Book; Tab.Series -> Ic.Series; Tab.Playing -> Ic.Play; Tab.Analyzer -> Ic.Wave },
+                        when (tab) { Tab.Library -> Ic.Library; Tab.Books -> Ic.Book; Tab.Series -> Ic.Series; Tab.Playing -> Ic.Play },
                         contentDescription = null, tint = tint, modifier = Modifier.size(21.dp),
                     )
                     Spacer(Modifier.height(3.dp))

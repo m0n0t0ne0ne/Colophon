@@ -2,24 +2,19 @@ package io.github.m0n0t0ne0ne.colophon.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.work.WorkInfo
 import io.github.m0n0t0ne0ne.colophon.core.SectionKind
 import io.github.m0n0t0ne0ne.colophon.core.Timeline
-import io.github.m0n0t0ne0ne.colophon.data.Book
 import io.github.m0n0t0ne0ne.colophon.data.Bookmark
 import io.github.m0n0t0ne0ne.colophon.data.Chapter
 
@@ -34,12 +29,9 @@ fun ChaptersContent(
     original: List<Chapter>,
     bookmarks: List<Bookmark>,
     positionMs: Long,
-    hasReview: Boolean,
     onBack: () -> Unit,
     onPlayAt: (Long) -> Unit,
     onEdit: (Chapter) -> Unit,
-    onAnalyze: () -> Unit,
-    onReview: () -> Unit,
     onAddHere: () -> Unit,
     onReset: () -> Unit,
     onPadNumbers: (Int) -> Unit,
@@ -61,19 +53,10 @@ fun ChaptersContent(
 
     Column(Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 20.dp)) {
         HeaderRow("Chapters", onBack) {
-            OutlinedButton(
-                onClick = if (hasReview) onReview else onAnalyze, shape = RoundedCornerShape(6.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, if (hasReview) C.Warn else C.Border),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = if (hasReview) C.Warn else C.Text),
-                contentPadding = PaddingValues(horizontal = 12.dp),
-            ) {
-                Icon(Ic.Wave, null, Modifier.size(16.dp))
-                Spacer(Modifier.width(7.dp))
-                Text(if (hasReview) "Review results" else "Analyze audio", fontFamily = Sans)
-            }
             Box {
                 IconBtn(Ic.More, "Chapter options") { menu = true }
                 DropdownMenu(menu, { menu = false }) {
+                    DropdownMenuItem(text = { Text("No number padding (1, 2…)") }, onClick = { menu = false; onPadNumbers(1) })
                     DropdownMenuItem(text = { Text("Pad numbers to 01, 02…") }, onClick = { menu = false; onPadNumbers(2) })
                     DropdownMenuItem(text = { Text("Pad numbers to 001, 002…") }, onClick = { menu = false; onPadNumbers(3) })
                 }
@@ -140,140 +123,6 @@ fun ChaptersContent(
             confirmButton = { TextButton(onClick = { confirmReset = false; onReset() }) { Text("Reset", color = C.Warn) } },
             dismissButton = { TextButton(onClick = { confirmReset = false }) { Text("Cancel") } },
         )
-    }
-}
-
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
-@Composable
-fun AnalyzerContent(
-    books: List<Book>,
-    runs: List<AnalysisRun>,
-    reviews: List<Long>,
-    onlyCharging: Boolean,
-    onCharging: (Boolean) -> Unit,
-    onAnalyze: (Long) -> Unit,
-    onCancel: (Long) -> Unit,
-    onReview: (Long) -> Unit,
-    onClearFailed: () -> Unit,
-    fullScan: Boolean = false,
-    onFullScan: (Boolean) -> Unit = {},
-    onSetAnalyzed: (Long, Boolean) -> Unit = { _, _ -> },
-) {
-    Column(Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 20.dp)) {
-        Spacer(Modifier.height(8.dp))
-        HeaderRow("Analyzer", null)
-        Text("Finds chapters and titles by listening after longer pauses. It runs on this phone, and nothing is uploaded.", style = Small)
-        Spacer(Modifier.height(8.dp))
-        Row(Modifier.fillMaxWidth().clickable { onCharging(!onlyCharging) }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Run only while charging", style = Body)
-                Text("Applies the next time you start an analysis.", style = Tiny)
-            }
-            Switch(onlyCharging, onCharging, colors = SwitchDefaults.colors(checkedThumbColor = C.Ground, checkedTrackColor = C.Text))
-        }
-        Row(Modifier.fillMaxWidth().clickable { onFullScan(!fullScan) }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Scan the whole book", style = Body)
-                Text("Slower. Off uses the file's chapter markers when it has them.", style = Tiny)
-            }
-            Spacer(Modifier.width(12.dp))
-            Switch(fullScan, onFullScan, colors = SwitchDefaults.colors(checkedThumbColor = C.Ground, checkedTrackColor = C.Text))
-        }
-        HorizontalDivider(color = C.Line)
-        val busy: (Book) -> Boolean = { b -> runs.any { it.bookId == b.id && it.state != WorkInfo.State.FAILED } || b.id in reviews }
-        val toDo = books.filter { busy(it) || it.analyzedAt == 0L }
-        val analyzed = books.filter { !busy(it) && it.analyzedAt > 0L }
-        var section by rememberSaveable { mutableIntStateOf(0) }
-        val shown = if (section == 0) toDo else analyzed
-        UnderlineTabs(listOf("To analyze (${toDo.size})", "Analyzed (${analyzed.size})"), section) { section = it }
-        LazyColumn(Modifier.fillMaxSize()) {
-            items(shown, key = { it.id }) { book ->
-                val run = runs.firstOrNull { it.bookId == book.id }
-                var menu by remember { mutableStateOf(false) }
-                Row(
-                    Modifier.fillMaxWidth().combinedClickable(onClick = {}, onLongClick = { menu = true }, onLongClickLabel = "Book options").padding(vertical = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    DropdownMenu(menu, { menu = false }) {
-                        if (book.analyzedAt > 0L) DropdownMenuItem(text = { Text("Move to To analyze") }, onClick = { menu = false; onSetAnalyzed(book.id, false) })
-                        else DropdownMenuItem(text = { Text("Mark as analyzed") }, onClick = { menu = false; onSetAnalyzed(book.id, true) })
-                    }
-                    Cover(book, 52.dp)
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        Text(book.title, style = Body, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        when {
-                            run?.state == WorkInfo.State.RUNNING -> {
-                                ThinProgress(run.percent / 100f)
-                                Text("${run.percent}% · ${run.detail.ifBlank { "Starting" }}", style = Tiny)
-                            }
-                            run?.state == WorkInfo.State.ENQUEUED -> Text(if (onlyCharging) "Waiting for the charger" else "Waiting to start", style = Tiny)
-                            run?.state == WorkInfo.State.FAILED -> Text(run.detail.ifBlank { "Analysis failed" }, style = Tiny.copy(color = C.Warn))
-                            book.id in reviews -> Text("Results ready to review", style = Tiny.copy(color = C.Warn))
-                        }
-                    }
-                    when {
-                        run?.state == WorkInfo.State.RUNNING || run?.state == WorkInfo.State.ENQUEUED ->
-                            SecondaryButton("Cancel", Modifier.width(92.dp), 44.dp) { onCancel(book.id) }
-                        book.id in reviews -> SecondaryButton("Review", Modifier.width(92.dp), 44.dp, C.Warn) { onReview(book.id) }
-                        else -> SecondaryButton(if (book.analyzedAt > 0L) "Run again" else "Analyze", Modifier.width(92.dp), 44.dp) {
-                            if (run?.state == WorkInfo.State.FAILED) onClearFailed()
-                            onAnalyze(book.id)
-                        }
-                    }
-                }
-                HorizontalDivider(color = C.Line)
-            }
-            if (books.isNotEmpty() && shown.isEmpty()) item {
-                Text(if (section == 0) "Nothing left to analyze." else "Books appear here after you save their analyzed chapters.", style = Small, modifier = Modifier.padding(vertical = 20.dp))
-            }
-            if (books.isEmpty()) item { Text("Add a book to your library first.", style = Small, modifier = Modifier.padding(vertical = 20.dp)) }
-        }
-    }
-}
-
-@Composable
-fun ReviewContent(
-    chapters: List<Chapter>,
-    onBack: () -> Unit,
-    onPreview: (Long) -> Unit,
-    onEdit: (Chapter) -> Unit,
-    onAccept: (Chapter) -> Unit,
-    onSave: () -> Unit,
-    onDiscard: () -> Unit,
-    previewing: Boolean = false,
-    onStopPreview: () -> Unit = {},
-) {
-    val flagged = chapters.filter { it.reason != null }
-    var showAll by rememberSaveable { mutableStateOf(false) }
-    Column(Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 20.dp)) {
-        HeaderRow(if (flagged.isEmpty()) "All checked" else "${flagged.size} to check", onBack)
-        Text("${chapters.size} sections found. Playback order always follows the audio timeline.", style = Small)
-        Spacer(Modifier.height(4.dp))
-        UnderlineTabs(listOf("To check", "All sections"), if (showAll) 1 else 0) { showAll = it == 1 }
-        LazyColumn(Modifier.weight(1f)) {
-            items(if (showAll) chapters else flagged, key = { it.id }) { c ->
-                Column(Modifier.padding(vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.offset(x = (-10).dp)) { IconBtn(Ic.Play, "Preview ${c.title}") { onPreview(c.startMs) } }
-                        Column(Modifier.weight(1f)) {
-                            Text(c.title, style = Body)
-                            c.reason?.let { Text(it, style = Small.copy(color = C.Warn)) }
-                        }
-                        Text(hms(c.startMs), style = Tiny)
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        SecondaryButton("Edit", Modifier.weight(1f), 44.dp) { onEdit(c) }
-                        if (c.reason != null) SecondaryButton("Accept", Modifier.weight(1f), 44.dp) { onAccept(c) }
-                    }
-                }
-                HorizontalDivider(color = C.Line)
-            }
-        }
-        if (previewing) PrimaryButton("Stop preview", Modifier.fillMaxWidth().padding(top = 10.dp), onClick = onStopPreview)
-        Row(Modifier.fillMaxWidth().padding(vertical = 10.dp).navigationBarsPadding(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SecondaryButton("Discard", Modifier.weight(1f), onClick = onDiscard)
-            PrimaryButton("Save chapters", Modifier.weight(1f), onClick = onSave)
-        }
     }
 }
 

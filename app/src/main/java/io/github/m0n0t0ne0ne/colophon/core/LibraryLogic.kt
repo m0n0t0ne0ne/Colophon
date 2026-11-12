@@ -2,6 +2,11 @@ package io.github.m0n0t0ne0ne.colophon.core
 
 import kotlin.math.abs
 
+/** The kinds of section a chapter can be, shown as choices when editing a chapter. */
+enum class SectionKind(val label: String) {
+    CHAPTER("Chapter"), PROLOGUE("Prologue"), EPILOGUE("Epilogue"), INTRO("Intro"), PART("Part"), OTHER("Other")
+}
+
 /** Decides which places are worth saving as a jump-back point, so the undo list stays meaningful. */
 object JumpHistory {
     const val MIN_JUMP_MS = 60_000L
