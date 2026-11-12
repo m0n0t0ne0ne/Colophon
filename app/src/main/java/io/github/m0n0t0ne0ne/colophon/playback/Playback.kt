@@ -25,9 +25,11 @@ import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionResult
+import androidx.media3.session.MediaSession.MediaItemsWithStartPosition
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import com.google.common.util.concurrent.SettableFuture
 import io.github.m0n0t0ne0ne.colophon.MainActivity
 import io.github.m0n0t0ne0ne.colophon.R
 import io.github.m0n0t0ne0ne.colophon.core.JumpHistory
@@ -102,6 +104,39 @@ class PlaybackService : MediaSessionService() {
                 else -> return Futures.immediateFuture(SessionResult(SessionResult.RESULT_ERROR_NOT_SUPPORTED))
             }
             return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+        }
+
+        // When the system reclaims the paused service and later offers a "resume" entry (lock screen,
+        // media widget), it asks what to play. Returning the last book rebinds the controls to Colophon
+        // with its title and cover, so the entry opens the app instead of falling back to the audio file.
+        @OptIn(UnstableApi::class)
+        override fun onPlaybackResumption(
+            mediaSession: MediaSession,
+            controller: MediaSession.ControllerInfo,
+        ): ListenableFuture<MediaItemsWithStartPosition> {
+            val future = SettableFuture.create<MediaItemsWithStartPosition>()
+            scope.launch {
+                runCatching {
+                    val dao = ColophonDatabase.get(this@PlaybackService).dao()
+                    val book = dao.lastPlayedBook() ?: error("no recent book")
+                    val bookFiles = dao.files(book.id).takeIf { it.isNotEmpty() } ?: error("no files")
+                    val artwork = book.coverPath?.let { Uri.fromFile(File(it)) }
+                    val items = bookFiles.map { f ->
+                        MediaItem.Builder()
+                            .setMediaId(mediaId(book.id, f.idx))
+                            .setUri(f.uri)
+                            .setMediaMetadata(
+                                MediaMetadata.Builder().setTitle(book.title).setArtist(book.author).setArtworkUri(artwork).build(),
+                            )
+                            .build()
+                    }
+                    val durations = bookFiles.map { it.durationMs }
+                    val start = if (book.finished) 0L else book.positionMs.coerceAtLeast(0)
+                    val (index, offset) = Timeline.locate(durations, start)
+                    MediaItemsWithStartPosition(items, index, offset)
+                }.fold({ future.set(it) }, { future.setException(it) })
+            }
+            return future
         }
     }
 

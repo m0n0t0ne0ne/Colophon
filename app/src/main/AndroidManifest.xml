@@ -37,6 +37,16 @@
             </intent-filter>
         </service>
 
+        <!-- Lets the system find and resume the session after the paused service is reclaimed, so the
+             media controls stay tied to Colophon instead of falling back to the audio file. -->
+        <receiver
+            android:name="androidx.media3.session.MediaButtonReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
+            </intent-filter>
+        </receiver>
+
         <service
             android:name="androidx.work.impl.foreground.SystemForegroundService"
             android:foregroundServiceType="dataSync"

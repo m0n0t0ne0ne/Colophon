@@ -75,6 +75,7 @@ interface LibraryDao {
     @Query("DELETE FROM PositionHistory WHERE bookId = :id") suspend fun deleteHistory(id: Long)
     @Query("SELECT * FROM Book WHERE id = :id") fun bookFlow(id: Long): Flow<Book?>
     @Query("SELECT * FROM Book WHERE id = :id") suspend fun book(id: Long): Book?
+    @Query("SELECT * FROM Book WHERE lastPlayedAt > 0 ORDER BY lastPlayedAt DESC LIMIT 1") suspend fun lastPlayedBook(): Book?
     @Query("SELECT * FROM Book WHERE sourceKey = :key") suspend fun bookByKey(key: String): Book?
     @Query("SELECT * FROM Book WHERE series = :series") suspend fun booksInSeries(series: String): List<Book>
     @Insert suspend fun insert(book: Book): Long
