@@ -84,6 +84,24 @@ class CoreTest {
         assertEquals(2013, g.year)
     }
 
+    @Test fun romanNumerals() {
+        assertEquals("I", Roman.of(1))
+        assertEquals("IV", Roman.of(4))
+        assertEquals("VII", Roman.of(7))
+        assertEquals("XIX", Roman.of(19))
+        assertEquals("XL", Roman.of(40))
+        assertEquals("MCMXCIV", Roman.of(1994))
+        assertNull(Roman.of(0))
+        assertNull(Roman.of(4000))
+    }
+
+    @Test fun bookNumberHonoursSeriesChoice() {
+        assertEquals("III", Roman.bookNumber(3.0, roman = true))
+        assertEquals("3", Roman.bookNumber(3.0, roman = false))
+        // Prequels and half-numbers can't be Roman, so they stay as digits.
+        assertEquals("1.5", Roman.bookNumber(1.5, roman = true))
+    }
+
     @Test fun timelineCrossesFiles() {
         val files = listOf(1000L, 2000L, 3000L)
         assertEquals(1 to 500L, Timeline.locate(files, 1500))

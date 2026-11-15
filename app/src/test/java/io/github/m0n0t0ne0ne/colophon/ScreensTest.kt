@@ -79,7 +79,7 @@ class ScreensTest {
         val colors = ArtColors(Color(0xFF6B3A28), Color(0xFFF0A868), swatches, swatches)
         rule.setContent {
             ColophonTheme {
-                PlayerContent(book, PlayerState(bookId = 3, positionMs = 23 * hours, durationMs = 30 * hours, playing = true), chapters, mode, 0.6f, colors, null, emptyList(), PlayerActions())
+                PlayerContent(book, PlayerState(bookId = 3, positionMs = 23 * hours, durationMs = 30 * hours, playing = true), chapters, mode, 0.6f, colors, null, false, emptyList(), PlayerActions())
             }
         }
         shoot(name)

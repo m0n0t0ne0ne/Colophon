@@ -92,6 +92,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         runCatching { BackgroundMode.valueOf(prefs.getString("bg", "Art")!!) }.getOrDefault(BackgroundMode.Art),
     )
     val backgroundStrength = MutableStateFlow(prefs.getFloat("bgStrength", 0.6f))
+    // Series whose book numbers are shown as Roman numerals, by series name.
+    val romanSeries = MutableStateFlow(prefs.getStringSet("romanSeries", emptySet()).orEmpty())
     val resumeRewindSec = MutableStateFlow(prefs.getInt("resumeRewindSec", 15))
     val sleepChime = MutableStateFlow(prefs.getBoolean("sleepChime", true))
     val sleepShake = MutableStateFlow(prefs.getBoolean("sleepShake", false))
@@ -161,6 +163,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setStrength(value: Float) {
         backgroundStrength.value = value
         prefs.edit().putFloat("bgStrength", value).apply()
+    }
+
+    /** Turns Roman-numeral book numbers on or off for a whole series, by name. */
+    fun setSeriesRoman(series: String, roman: Boolean) {
+        val name = series.trim()
+        if (name.isEmpty()) return
+        romanSeries.value = if (roman) romanSeries.value + name else romanSeries.value - name
+        prefs.edit().putStringSet("romanSeries", romanSeries.value).apply()
     }
 
     fun bookFlow(id: Long) = dao.bookFlow(id)

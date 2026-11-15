@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import io.github.m0n0t0ne0ne.colophon.core.ChapterHeading
+import io.github.m0n0t0ne0ne.colophon.core.Roman
 import io.github.m0n0t0ne0ne.colophon.core.Timeline
 import io.github.m0n0t0ne0ne.colophon.core.formatClock
 import io.github.m0n0t0ne0ne.colophon.data.Book
@@ -78,6 +79,7 @@ fun PlayerContent(
     strength: Float,
     colors: ArtColors,
     accentChoice: Color?,
+    romanNumber: Boolean,
     jumps: List<Long>,
     actions: PlayerActions,
 ) {
@@ -106,7 +108,7 @@ fun PlayerContent(
                 Box(Modifier.offset(x = (-12).dp)) { IconBtn(Ic.Down, "Close player", OnArt, actions.onBack) }
                 val series = book.series
                 Text(
-                    if (series != null) listOfNotNull(book.seriesNumber?.let { "Book ${it.toInt()}" }, series).joinToString(" · ") else book.author,
+                    if (series != null) listOfNotNull(book.seriesNumber?.let { "Book ${Roman.bookNumber(it, romanNumber)}" }, series).joinToString(" · ") else book.author,
                     style = Small.copy(color = OnArtSoft, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center),
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f).then(if (series != null) Modifier.clickable(onClick = actions.onSeries) else Modifier).padding(vertical = 12.dp),

@@ -27,6 +27,7 @@ fun ColophonApp(vm: AppViewModel) {
     val nav = rememberNavController()
     val books by vm.books.collectAsStateWithLifecycle()
     val player by vm.hub.state.collectAsStateWithLifecycle()
+    val romanSeries by vm.romanSeries.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val entry by nav.currentBackStackEntryAsState()
@@ -91,6 +92,7 @@ fun ColophonApp(vm: AppViewModel) {
                         { b -> nav.navigate("details/${b.id}") },
                         { b -> vm.removeBook(b.id) },
                         { vm.removeSeries(name); nav.popBackStack() },
+                        roman = name in romanSeries,
                     )
                 }
                 composable("player/{id}", listOf(idArg())) { e -> PlayerRoute(vm, nav, e.id()) }
@@ -140,6 +142,7 @@ private fun PlayerRoute(vm: AppViewModel, nav: NavHostController, id: Long) {
     val mode by vm.backgroundMode.collectAsStateWithLifecycle()
     val strength by vm.backgroundStrength.collectAsStateWithLifecycle()
     val accentOverride by vm.accentOverride.collectAsStateWithLifecycle()
+    val romanSeries by vm.romanSeries.collectAsStateWithLifecycle()
     val b = book ?: return
     var colors by remember { mutableStateOf(ArtColors(C.Raised, C.Accent)) }
     LaunchedEffect(b.coverPath) { colors = vm.artColors(b.coverPath) }
@@ -147,7 +150,7 @@ private fun PlayerRoute(vm: AppViewModel, nav: NavHostController, id: Long) {
     LaunchedEffect(id) { if (vm.hub.state.value.bookId != id) vm.play(id, autoplay = false) }
     val shown = if (state.bookId == id) state else state.copy(positionMs = b.positionMs, durationMs = b.durationMs, playing = false, speed = b.speed)
     PlayerContent(
-        b, shown, chapters, mode, strength, colors, accentOverride, history.map { it.positionMs },
+        b, shown, chapters, mode, strength, colors, accentOverride, b.series in romanSeries, history.map { it.positionMs },
         PlayerActions(
             onBack = { nav.popBackStack() },
             onSeries = { b.series?.let { nav.navigate("series/${Uri.encode(it)}") } },
@@ -211,6 +214,7 @@ private fun EditorRoute(vm: AppViewModel, nav: NavHostController, id: Long) {
 @Composable
 private fun DetailsRoute(vm: AppViewModel, nav: NavHostController, id: Long) {
     val book by remember(id) { vm.bookFlow(id) }.collectAsStateWithLifecycle(null)
+    val romanSeries by vm.romanSeries.collectAsStateWithLifecycle()
     val b: Book = book ?: return
     var pending by remember { mutableStateOf<((String?) -> Unit)?>(null) }
     // The document picker (Storage Access Framework) lets the cover come from anywhere the phone can
@@ -228,6 +232,8 @@ private fun DetailsRoute(vm: AppViewModel, nav: NavHostController, id: Long) {
             { vm.removeBook(id); nav.go("library") },
             { nav.navigate("tags/$id") },
             { vm.reloadFromFile(id); nav.popBackStack() },
+            romanSeries = romanSeries,
+            onSeriesRoman = vm::setSeriesRoman,
         )
     }
 }

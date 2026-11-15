@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import io.github.m0n0t0ne0ne.colophon.R
+import io.github.m0n0t0ne0ne.colophon.core.Roman
 import io.github.m0n0t0ne0ne.colophon.data.Book
 import java.io.File
 
@@ -127,7 +128,7 @@ fun IconBtn(icon: ImageVector, label: String, tint: Color = C.Text, onClick: () 
 }
 
 @Composable
-fun Cover(book: Book, size: Dp, modifier: Modifier = Modifier, numberOnly: Boolean = false, plain: Boolean = false) {
+fun Cover(book: Book, size: Dp, modifier: Modifier = Modifier, numberOnly: Boolean = false, plain: Boolean = false, roman: Boolean = false) {
     val shape = RoundedCornerShape(if (size < 80.dp) 3.dp else 4.dp)
     val path = book.coverPath
     if (path != null && File(path).exists()) {
@@ -138,7 +139,7 @@ fun Cover(book: Book, size: Dp, modifier: Modifier = Modifier, numberOnly: Boole
     } else {
         val tone = C.tones[((book.seriesNumber?.toInt() ?: book.id.toInt()).mod(C.tones.size))]
         Box(modifier.size(size).clip(shape).background(tone).padding(if (size < 80.dp) 2.dp else 10.dp), contentAlignment = if (numberOnly) Alignment.Center else Alignment.BottomStart) {
-            val number = book.seriesNumber?.let { if (it == 0.0) "P" else if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() }
+            val number = book.seriesNumber?.let { if (it == 0.0) "P" else Roman.bookNumber(it, roman) }
             if (plain) {
                 Spacer(Modifier.size(1.dp))
             } else if (numberOnly && number != null) {

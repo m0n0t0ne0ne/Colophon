@@ -23,6 +23,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.m0n0t0ne0ne.colophon.core.Roman
 import io.github.m0n0t0ne0ne.colophon.core.formatLeft
 import io.github.m0n0t0ne0ne.colophon.data.Book
 
@@ -218,6 +219,7 @@ fun SeriesContent(
     onEdit: (Book) -> Unit,
     onRemoveBook: (Book) -> Unit = {},
     onRemoveSeries: () -> Unit = {},
+    roman: Boolean = false,
 ) {
     var mode by rememberSaveable { mutableIntStateOf(0) }
     var seriesMenu by remember { mutableStateOf(false) }
@@ -242,7 +244,7 @@ fun SeriesContent(
         UnderlineTabs(listOf("Publication order", "Series order"), mode) { mode = it }
         LazyColumn(Modifier.fillMaxSize()) {
             items(ordered, key = { it.id }) { book ->
-                SeriesBookRow(book, { onOpenBook(book) }, { onEdit(book) }, { onRemoveBook(book) })
+                SeriesBookRow(book, { onOpenBook(book) }, { onEdit(book) }, { onRemoveBook(book) }, roman)
                 HorizontalDivider(color = Color0)
             }
         }
@@ -260,7 +262,7 @@ fun SeriesContent(
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun SeriesBookRow(book: Book, onOpen: () -> Unit, onEdit: () -> Unit, onRemove: () -> Unit) {
+private fun SeriesBookRow(book: Book, onOpen: () -> Unit, onEdit: () -> Unit, onRemove: () -> Unit, roman: Boolean = false) {
     var menu by remember { mutableStateOf(false) }
     var confirm by remember { mutableStateOf(false) }
     Box {
@@ -268,11 +270,11 @@ private fun SeriesBookRow(book: Book, onOpen: () -> Unit, onEdit: () -> Unit, on
             Modifier.fillMaxWidth().combinedClickable(onClick = onOpen, onLongClick = { menu = true }, onLongClickLabel = "Book options").padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically,
         ) {
-            Cover(book, 56.dp, numberOnly = true)
+            Cover(book, 56.dp, numberOnly = true, roman = roman)
             Column(Modifier.weight(1f)) {
                 Text(book.title, style = BookTitle.copy(fontSize = 18.sp), maxLines = 2, overflow = TextOverflow.Ellipsis)
                 val meta = listOfNotNull(
-                    book.seriesNumber?.let { if (it == 0.0) "Prequel" else "Book ${if (it % 1.0 == 0.0) it.toInt().toString() else it.toString()}" },
+                    book.seriesNumber?.let { if (it == 0.0) "Prequel" else "Book ${Roman.bookNumber(it, roman)}" },
                     book.year?.toString(),
                 ).joinToString(" · ")
                 if (meta.isNotEmpty()) Text(meta, style = Small)
@@ -302,6 +304,8 @@ fun DetailsScreen(
     onRemove: () -> Unit,
     onViewTags: () -> Unit = {},
     onReload: () -> Unit = {},
+    romanSeries: Set<String> = emptySet(),
+    onSeriesRoman: (String, Boolean) -> Unit = { _, _ -> },
 ) {
     var title by rememberSaveable { mutableStateOf(book.title) }
     var author by rememberSaveable { mutableStateOf(book.author) }
@@ -328,6 +332,20 @@ fun DetailsScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Field("Book number (0 for prequel)", number, Modifier.weight(1f), KeyboardType.Decimal) { number = it }
                 Field("Year", year, Modifier.width(96.dp), KeyboardType.Number) { year = it }
+            }
+            if (series.isNotBlank()) {
+                val seriesRoman = series.trim() in romanSeries
+                val sample = number.toDoubleOrNull()?.takeIf { it % 1.0 == 0.0 && it >= 1.0 }?.toInt() ?: 3
+                Row(
+                    Modifier.fillMaxWidth().clickable { onSeriesRoman(series.trim(), !seriesRoman) },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Roman numerals for this series", style = Body)
+                        Text("Shows every book in “${series.trim()}” as “Book ${Roman.of(sample)}”.", style = Tiny)
+                    }
+                    Switch(seriesRoman, { onSeriesRoman(series.trim(), it) }, colors = SwitchDefaults.colors(checkedThumbColor = C.Ground, checkedTrackColor = C.Text))
+                }
             }
             if (series.isNotBlank() && cover != book.coverPath) {
                 UnderlineTabs(listOf("Cover: this book", "Whole series"), whole) { whole = it }

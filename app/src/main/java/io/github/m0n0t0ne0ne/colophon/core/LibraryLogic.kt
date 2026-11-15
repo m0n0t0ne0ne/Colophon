@@ -7,6 +7,36 @@ enum class SectionKind(val label: String) {
     CHAPTER("Chapter"), PROLOGUE("Prologue"), EPILOGUE("Epilogue"), INTRO("Intro"), PART("Part"), OTHER("Other")
 }
 
+/** Classic Roman numerals for series book numbers, for series the reader chooses to show that way. */
+object Roman {
+    private val VALUES = listOf(
+        1000 to "M", 900 to "CM", 500 to "D", 400 to "CD", 100 to "C", 90 to "XC",
+        50 to "L", 40 to "XL", 10 to "X", 9 to "IX", 5 to "V", 4 to "IV", 1 to "I",
+    )
+
+    /** The classic numeral for 1..3999, or null outside that range (Romans had no zero). */
+    fun of(n: Int): String? {
+        if (n !in 1..3999) return null
+        val out = StringBuilder()
+        var rest = n
+        for ((value, sym) in VALUES) while (rest >= value) { out.append(sym); rest -= value }
+        return out.toString()
+    }
+
+    /**
+     * A book number as text. Whole numbers in a Roman-numeral series become numerals; prequels (0) and
+     * half-numbers (1.5) always stay as digits, since Roman numerals can't express them.
+     */
+    fun bookNumber(number: Double, roman: Boolean): String {
+        val whole = if (number % 1.0 == 0.0) number.toInt() else null
+        return when {
+            roman && whole != null -> of(whole) ?: whole.toString()
+            whole != null -> whole.toString()
+            else -> number.toString()
+        }
+    }
+}
+
 /** Decides which places are worth saving as a jump-back point, so the undo list stays meaningful. */
 object JumpHistory {
     const val MIN_JUMP_MS = 60_000L
