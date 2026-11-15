@@ -27,6 +27,10 @@ data class Book(
     @ColumnInfo(defaultValue = "0") val analyzedAt: Long = 0,
     /** Hidden from Continue listening until the book is played again. Its place is kept. */
     @ColumnInfo(defaultValue = "0") val hiddenFromContinue: Boolean = false,
+    /** Title, author and series came from tags the file vouches for (docs/tag-contract.md), not from names. */
+    @ColumnInfo(defaultValue = "0") val fromTags: Boolean = false,
+    /** Size and date of the files when last read; a change means the file was edited and is read again. */
+    val fileStamp: String? = null,
 )
 
 @Entity(primaryKeys = ["bookId", "idx"])
@@ -128,7 +132,7 @@ interface LibraryDao {
     suspend fun trimHistory(id: Long)
 }
 
-@Database(entities = [Book::class, BookFile::class, Chapter::class, Bookmark::class, PositionHistory::class], version = 4, exportSchema = false)
+@Database(entities = [Book::class, BookFile::class, Chapter::class, Bookmark::class, PositionHistory::class], version = 5, exportSchema = false)
 abstract class ColophonDatabase : RoomDatabase() {
     abstract fun dao(): LibraryDao
 
@@ -151,10 +155,17 @@ abstract class ColophonDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE Book ADD COLUMN fromTags INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE Book ADD COLUMN fileStamp TEXT")
+            }
+        }
+
         @Volatile private var instance: ColophonDatabase? = null
         fun get(context: Context): ColophonDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(context.applicationContext, ColophonDatabase::class.java, "colophon.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .build().also { instance = it }
         }
     }

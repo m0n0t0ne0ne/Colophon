@@ -263,7 +263,12 @@ object BookNames {
         return Parsed(s.trim().trim('-', ',', ':').trim(), number, year)
     }
 
-    /** Removes a series name from either end of a title. */
+    // Words that show the series name is part of the title itself: "Harry Potter and the Philosopher's Stone"
+    // (a joining word right after the name) or "The Lord of the Rings" (a joining word right before it).
+    private val JOINS_AFTER = setOf("and", "&", "of", "in", "on", "at", "to", "for", "with", "or", "vs", "vs.")
+    private val JOINS_BEFORE = JOINS_AFTER + setOf("the", "a", "an")
+
+    /** Removes a series name from either end of a title, unless the name is part of the title itself. */
     fun withoutSeries(title: String, series: String?): String {
         val core = series?.let(SeriesNames::core)?.takeIf { it.length >= 4 } ?: return title
         val words = title.split(Regex("""\s+"""))
@@ -271,10 +276,11 @@ object BookNames {
         for (extra in 1 downTo 0) {
             val take = n + extra
             if (words.size <= take) continue
-            if (SeriesNames.core(words.takeLast(take).joinToString(" ")) == core) {
+            if (SeriesNames.core(words.takeLast(take).joinToString(" ")) == core &&
+                words[words.size - take - 1].lowercase() !in JOINS_BEFORE) {
                 return words.dropLast(take).joinToString(" ").trim().trim('-', ',', ':').trim()
             }
-            if (SeriesNames.core(words.take(take).joinToString(" ")) == core) {
+            if (SeriesNames.core(words.take(take).joinToString(" ")) == core && words[take].lowercase() !in JOINS_AFTER) {
                 return words.drop(take).joinToString(" ").trim().trim('-', ',', ':').trim()
             }
         }
@@ -359,13 +365,17 @@ data class ChapterHeading(val label: String, val name: String?) {
         private val SEPARATOR = Regex("""\s*[-–—]\s+|\s+[-–—]\s*|\s*:\s*""")
         // A bare chapter or track number: one to three digits, or zero-padded like "002" (not a 4-digit year).
         private val NUMBER = Regex("""0\d+|\d{1,3}""")
+        // A number written out: "Seven", "Twenty-Two", "One Hundred and Five".
+        private const val UNIT = "one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|" +
+            "fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety"
+        private val NUMBER_WORDS = Regex("""(?:$UNIT)(?:[\s-]+(?:$UNIT|hundred|and))*""", RegexOption.IGNORE_CASE)
         // "Chapter 16 Telling the Wheel": a numbered keyword, then the name, with only a space between.
         private val KEYWORD_SPACE = Regex(
             """^((?:chapter|ch\.?|part|book|section|volume|scene|track|episode)\s+\d+)\s+(\S.*)$""",
             RegexOption.IGNORE_CASE,
         )
 
-        private fun isLabel(text: String) = KEYWORD.matches(text) || NUMBER.matches(text)
+        private fun isLabel(text: String) = KEYWORD.matches(text) || NUMBER.matches(text) || NUMBER_WORDS.matches(text)
 
         fun of(title: String): ChapterHeading {
             val clean = title.trim()

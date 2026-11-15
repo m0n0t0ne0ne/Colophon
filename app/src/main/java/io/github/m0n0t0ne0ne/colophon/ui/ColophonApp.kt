@@ -227,6 +227,7 @@ private fun DetailsRoute(vm: AppViewModel, nav: NavHostController, id: Long) {
             { updated, whole -> vm.saveBook(updated, whole); nav.popBackStack() },
             { vm.removeBook(id); nav.go("library") },
             { nav.navigate("tags/$id") },
+            { vm.reloadFromFile(id); nav.popBackStack() },
         )
     }
 }
