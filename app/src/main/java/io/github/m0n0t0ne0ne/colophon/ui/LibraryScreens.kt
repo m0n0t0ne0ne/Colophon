@@ -301,6 +301,7 @@ fun DetailsScreen(
     onSave: (Book, Boolean) -> Unit,
     onRemove: () -> Unit,
     onViewTags: () -> Unit = {},
+    onReload: () -> Unit = {},
 ) {
     var title by rememberSaveable { mutableStateOf(book.title) }
     var author by rememberSaveable { mutableStateOf(book.author) }
@@ -332,6 +333,8 @@ fun DetailsScreen(
                 UnderlineTabs(listOf("Cover: this book", "Whole series"), whole) { whole = it }
             }
             SecondaryButton("View file tags", Modifier.fillMaxWidth()) { onViewTags() }
+            SecondaryButton("Reload from file", Modifier.fillMaxWidth()) { onReload() }
+            Text("Replaces these details, the cover and the chapters with what the file says.", style = Tiny)
             TextButton(onClick = { confirm = true }) { Text("Remove from library", color = C.Warn) }
             Text("This removes the book from Colophon. Your audio file stays on your phone.", style = Tiny)
         }

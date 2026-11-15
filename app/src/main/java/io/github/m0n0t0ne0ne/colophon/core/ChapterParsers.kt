@@ -63,7 +63,7 @@ object Mp4Chapters {
         return if (quickTime.size >= nero.size) quickTime else nero
     }
 
-    private fun findMoov(source: ByteSource): ByteBuffer? {
+    internal fun findMoov(source: ByteSource): ByteBuffer? {
         var pos = 0L
         while (pos + 8 <= source.size) {
             val header = source.read(pos, 16)
@@ -90,7 +90,7 @@ object Mp4Chapters {
         return null
     }
 
-    private fun forEachAtom(parent: ByteBuffer, block: (String, ByteBuffer) -> Unit) {
+    internal fun forEachAtom(parent: ByteBuffer, block: (String, ByteBuffer) -> Unit) {
         val b = parent.duplicate()
         while (b.remaining() >= 8) {
             val start = b.position()
@@ -277,7 +277,7 @@ object Id3Chapters {
         return ParsedChapter(startMs, title)
     }
 
-    private inline fun forEachFrame(t: ByteArray, from: Int, to: Int, major: Int, block: (String, Int, Int) -> Unit) {
+    internal inline fun forEachFrame(t: ByteArray, from: Int, to: Int, major: Int, block: (String, Int, Int) -> Unit) {
         var p = from
         while (p + 10 <= to) {
             if (t[p] == 0.toByte()) return
@@ -289,11 +289,11 @@ object Id3Chapters {
         }
     }
 
-    private fun syncsafe(b: ByteArray, o: Int): Int =
+    internal fun syncsafe(b: ByteArray, o: Int): Int =
         ((b[o].toInt() and 0x7F) shl 21) or ((b[o + 1].toInt() and 0x7F) shl 14) or
             ((b[o + 2].toInt() and 0x7F) shl 7) or (b[o + 3].toInt() and 0x7F)
 
-    private fun decodeText(t: ByteArray, s: Int, e: Int): String {
+    internal fun decodeText(t: ByteArray, s: Int, e: Int): String {
         if (e <= s) return ""
         val charset = when (t[s].toInt()) {
             1 -> Charsets.UTF_16

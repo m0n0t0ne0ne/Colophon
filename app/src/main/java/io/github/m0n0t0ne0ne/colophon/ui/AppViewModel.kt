@@ -201,6 +201,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 } finally {
                     runCatching { retriever.release() }
                 }
+                Importer.readTags(context, Uri.parse(file.uri)).let { t ->
+                    t.series?.let { add(TagRow("Series", it)) }
+                    t.seriesNumber?.let { add(TagRow("Series part", if (it % 1.0 == 0.0) it.toInt().toString() else it.toString())) }
+                    if (t.curated) add(TagRow("Tagged for Colophon", "Yes"))
+                }
                 add(TagRow("Length", formatHms(file.durationMs)))
             }
             FileTags(Uri.decode(file.uri).substringAfterLast('/'), rows)
@@ -273,6 +278,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun resetChapters(bookId: Long) {
         viewModelScope.launch { dao.replaceSet(bookId, ChapterSet.CURRENT, dao.chapters(bookId, ChapterSet.ORIGINAL)) }
+    }
+
+    /**
+     * Forgets your edits to this book's details and reads everything again from the file: title, author,
+     * series, year, cover and chapters. Used after re-tagging a book in AudiobookStudio.
+     */
+    fun reloadFromFile(bookId: Long) = runImport {
+        dao.book(bookId)?.let { dao.update(it.copy(userEdited = false, fromTags = false, fileStamp = "reload", coverPath = null)) }
+        Importer(context, dao, removedFiles()).refresh().also {
+            dao.replaceSet(bookId, ChapterSet.CURRENT, dao.chapters(bookId, ChapterSet.ORIGINAL))
+        }
     }
 
     fun saveBook(book: Book, coverForSeries: Boolean) {

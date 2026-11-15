@@ -118,6 +118,20 @@ class Importer(private val context: Context, private val dao: LibraryDao, privat
                 addBook(plan, probes)
             }
         }
+        // Books added as single files (not inside an added folder) are checked as well, so a file
+        // re-saved in place - for example by AudiobookStudio - is noticed and read again.
+        for (book in dao.allBooks()) {
+            if (book.id in matched || missing.any { it.first.id == book.id }) continue
+            val files = dao.files(book.id)
+            if (files.isEmpty()) continue
+            val nodes = files.mapNotNull { f ->
+                runCatching { DocumentFile.fromSingleUri(context, Uri.parse(f.uri))?.takeIf { it.exists() } }.getOrNull()
+                    ?.let { ScanNode(it.name.orEmpty(), false, it) }
+            }
+            if (nodes.size != files.size) continue
+            refreshExisting(book.id, BookPlan(nodes, null, null, null, null), files.map { fileKey(it.uri) }, false)
+        }
+
         for ((book, files) in missing) {
             // If the same file was already added from its new location, keep your place on that copy.
             val copy = dao.allBooks().filter { it.id != book.id }.firstOrNull { other ->
@@ -144,25 +158,86 @@ class Importer(private val context: Context, private val dao: LibraryDao, privat
     private suspend fun refreshExisting(id: Long, plan: BookPlan, keys: List<String>, merged: Boolean) {
         val book = dao.book(id) ?: return
         val current = dao.files(id).map { fileKey(it.uri) }
-        if (current != keys) {
-            val probes = plan.files.mapNotNull { probe(it) }
-            if (probes.size == plan.files.size) saveFiles(id, probes)
+        // Size and date of the files: when they change, the file was edited (for example re-saved by
+        // AudiobookStudio), so its tags, chapters and cover are read again.
+        val stamp = stampOf(plan.files)
+        val firstSeen = book.fileStamp == null           // books from before this version: record, don't reload
+        val contentChanged = !firstSeen && stamp != book.fileStamp
+        var probes: List<Probe>? = null
+        if (current != keys || contentChanged || firstSeen) {
+            probes = plan.files.mapNotNull { probe(it) }.takeIf { it.size == plan.files.size }
+            if (probes != null && (current != keys || contentChanged)) saveFiles(id, probes)
         }
+        if (contentChanged && probes != null) reloadFromFiles(id, probes, plan)
         var next = dao.book(id) ?: return
         if (!book.userEdited) {
-            val g = BookNames.describe(plan.files.first().name, plan.bookFolder, usableSeries(plan.seriesFolder, book.author), book.title)
-            next = next.copy(
-                title = g.title,
-                series = g.series,
-                seriesNumber = g.number ?: next.seriesNumber,
-                year = g.year ?: next.year,
-            )
+            val tags = probes?.first()?.tags
+            next = when {
+                tags != null && tags.trusted -> applyTags(next, probes!!)
+                next.fromTags && probes == null -> next          // nothing new to read
+                else -> {
+                    val g = BookNames.describe(plan.files.first().name, plan.bookFolder, usableSeries(plan.seriesFolder, book.author), book.title)
+                    next.copy(
+                        title = g.title,
+                        series = g.series,
+                        seriesNumber = g.number ?: next.seriesNumber,
+                        year = g.year ?: next.year,
+                        fromTags = false,
+                    )
+                }
+            }
         }
+        if (probes != null) next = next.copy(fileStamp = stamp)
         if (next != dao.book(id)) {
             dao.update(next)
             updated++
         } else if (merged) updated++
     }
+
+    /**
+     * Tags the file vouches for (see docs/tag-contract.md) decide title, author, series and year,
+     * instead of guesses from folder and file names. Without them the book is left as it was.
+     */
+    private fun applyTags(book: Book, ordered: List<Probe>): Book {
+        val t = ordered.first().tags
+        if (!t.trusted) return book
+        val tagTitle = (if (ordered.size > 1) t.album ?: t.title else t.title ?: t.album)?.takeIf { it.any(Char::isLetter) }
+        val title = if (t.curated && tagTitle != null) tagTitle else BookNames.withoutSeries(book.title, t.series)
+        return book.copy(
+            title = title,
+            author = (if (t.curated) t.author else null) ?: book.author,
+            // A file that names its series is believed; a curated file with no series has none,
+            // whatever its folder is called.
+            series = t.series ?: if (t.curated) null else book.series,
+            seriesNumber = t.seriesNumber ?: if (t.curated) null else book.seriesNumber,
+            year = t.year ?: book.year,
+            fromTags = true,
+        )
+    }
+
+    /** The file changed on disk: read its chapters and cover again, keeping your own edits. */
+    private suspend fun reloadFromFiles(id: Long, probes: List<Probe>, plan: BookPlan) {
+        val fresh = readChapters(probes, plan.cue)
+        val original = dao.chapters(id, ChapterSet.ORIGINAL)
+        val current = dao.chapters(id, ChapterSet.CURRENT)
+        // Chapters you edited in Colophon stay; untouched ones follow the file.
+        val untouched = current.map { it.startMs to it.title } == original.map { it.startMs to it.title }
+        dao.replaceSet(id, ChapterSet.ORIGINAL, fresh)
+        if (untouched) dao.replaceSet(id, ChapterSet.CURRENT, fresh)
+        val book = dao.book(id) ?: return
+        val chosen = book.coverPath?.substringAfterLast('/')?.startsWith("custom_") == true
+        if (!chosen) probes.firstNotNullOfOrNull { it.picture }?.let { bytes ->
+            saveCover(id, bytes)?.let { path ->
+                book.coverPath?.let { old -> runCatching { File(old).delete() } }
+                dao.update(book.copy(coverPath = path))
+            }
+        }
+        // A re-saved file can be shorter (removed duplicated audio): keep the place inside the book.
+        dao.book(id)?.let { b -> if (b.durationMs > 0 && b.positionMs > b.durationMs) dao.update(b.copy(positionMs = b.durationMs - 1000)) }
+    }
+
+    private fun stampOf(nodes: List<ScanNode>): String =
+        nodes.joinToString("|") { n -> doc(n).let { "${it.length()}:${it.lastModified()}" } }
 
     /** A picture in the book's folder becomes its cover, unless you've chosen one yourself. */
     private suspend fun applyFolderCover(id: Long, plan: BookPlan): Boolean {
@@ -216,11 +291,11 @@ class Importer(private val context: Context, private val dao: LibraryDao, privat
         val files = dao.allFiles().groupBy { it.bookId }
         val items = books.map { b ->
             val fileName = Uri.decode(files[b.id]?.firstOrNull()?.uri.orEmpty()).substringAfterLast('/')
-            SeriesConsolidator.Item(b.id, b.series, b.seriesNumber, "${b.title} $fileName", b.userEdited)
+            SeriesConsolidator.Item(b.id, b.series, b.seriesNumber, "${b.title} $fileName", b.userEdited || b.fromTags)
         }
         val assigned = SeriesConsolidator.assign(items)
         books.forEach { b ->
-            if (b.userEdited) return@forEach
+            if (b.userEdited || b.fromTags) return@forEach
             val series = assigned[b.id]
             val next = b.copy(series = series, title = BookNames.withoutSeries(b.title, series))
             if (next != b) dao.update(next)
@@ -248,7 +323,7 @@ class Importer(private val context: Context, private val dao: LibraryDao, privat
 
     private class Probe(
         val node: ScanNode, val durationMs: Long, val title: String?, val artist: String?, val album: String?,
-        val year: Int?, val track: Int?, val picture: ByteArray?,
+        val year: Int?, val track: Int?, val picture: ByteArray?, val tags: BookTags,
     )
 
     private fun probe(node: ScanNode): Probe? {
@@ -267,6 +342,7 @@ class Importer(private val context: Context, private val dao: LibraryDao, privat
                     ?: tag(MediaMetadataRetriever.METADATA_KEY_DATE)?.take(4)?.toIntOrNull(),
                 tag(MediaMetadataRetriever.METADATA_KEY_CD_TRACK_NUMBER)?.substringBefore('/')?.trim()?.toIntOrNull(),
                 r.embeddedPicture,
+                readTags(context, doc(node).uri),
             )
         } catch (_: Exception) {
             null
@@ -285,17 +361,17 @@ class Importer(private val context: Context, private val dao: LibraryDao, privat
         val first = ordered.first()
         val tagTitle = if (ordered.size > 1) first.album else first.title
         val g = BookNames.describe(first.node.name, plan.bookFolder, usableSeries(plan.seriesFolder, first.artist.orEmpty()), tagTitle)
-        val id = dao.insert(
-            Book(
-                sourceKey = key,
-                title = g.title,
-                author = first.artist.orEmpty(),
-                series = g.series,
-                seriesNumber = g.number,
-                year = g.year ?: first.year,
-                durationMs = ordered.sumOf { it.durationMs },
-            ),
+        val guessed = Book(
+            sourceKey = key,
+            title = g.title,
+            author = first.artist.orEmpty(),
+            series = g.series,
+            seriesNumber = g.number,
+            year = g.year ?: first.year,
+            durationMs = ordered.sumOf { it.durationMs },
+            fileStamp = stampOf(ordered.map { it.node }),
         )
+        val id = dao.insert(applyTags(guessed, ordered))
         dao.insertFiles(ordered.mapIndexed { i, p -> BookFile(id, i, doc(p.node).uri.toString(), p.durationMs) })
 
         val cover = ordered.firstNotNullOfOrNull { it.picture }?.let { saveCover(id, it) }
@@ -345,26 +421,8 @@ class Importer(private val context: Context, private val dao: LibraryDao, privat
         return out
     }
 
-    private fun readEmbedded(uri: Uri): List<ParsedChapter> = runCatching {
-        context.contentResolver.openFileDescriptor(uri, "r")!!.use { pfd ->
-            FileInputStream(pfd.fileDescriptor).use { stream ->
-                val channel = stream.channel
-                ChapterParser.parse(object : ByteSource {
-                    override val size: Long = channel.size()
-                    override fun read(position: Long, length: Int): ByteArray {
-                        val b = ByteBuffer.allocate(length)
-                        var p = position
-                        while (b.hasRemaining()) {
-                            val n = channel.read(b, p)
-                            if (n <= 0) break
-                            p += n
-                        }
-                        return b.array().copyOf(b.position())
-                    }
-                })
-            }
-        }
-    }.getOrDefault(emptyList())
+    private fun readEmbedded(uri: Uri): List<ParsedChapter> =
+        withSource(context, uri, emptyList()) { ChapterParser.parse(it) }
 
     private fun saveCover(id: Long, bytes: ByteArray): String? = runCatching {
         Covers.dir(context).resolve("book_${id}_${System.currentTimeMillis()}.img").also { it.writeBytes(bytes) }.absolutePath
@@ -375,6 +433,31 @@ class Importer(private val context: Context, private val dao: LibraryDao, privat
     private fun treeKey(uri: Uri): String = "${uri.authority}|${DocumentsContract.getTreeDocumentId(uri)}"
 
     companion object {
+        /** Series and other book tags read straight from the file (see core/BookTags.kt). */
+        fun readTags(context: Context, uri: Uri): BookTags = withSource(context, uri, BookTags()) { BookTags.parse(it) }
+
+        /** Random access to a document's bytes, so large books are never loaded whole. */
+        fun <T> withSource(context: Context, uri: Uri, fallback: T, block: (ByteSource) -> T): T = runCatching {
+            context.contentResolver.openFileDescriptor(uri, "r")!!.use { pfd ->
+                FileInputStream(pfd.fileDescriptor).use { stream ->
+                    val channel = stream.channel
+                    block(object : ByteSource {
+                        override val size: Long = channel.size()
+                        override fun read(position: Long, length: Int): ByteArray {
+                            val b = ByteBuffer.allocate(length)
+                            var p = position
+                            while (b.hasRemaining()) {
+                                val n = channel.read(b, p)
+                                if (n <= 0) break
+                                p += n
+                            }
+                            return b.array().copyOf(b.position())
+                        }
+                    })
+                }
+            }
+        }.getOrDefault(fallback)
+
         /** The same file reached through different added folders has different URIs but one document id. */
         fun fileKey(uri: String): String = runCatching {
             val u = Uri.parse(uri)
