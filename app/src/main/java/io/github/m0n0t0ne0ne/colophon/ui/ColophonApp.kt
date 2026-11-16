@@ -202,8 +202,16 @@ private fun EditorRoute(vm: AppViewModel, nav: NavHostController, id: Long) {
         c, b, siblings,
         onBack = { nav.popBackStack() },
         onSave = { vm.saveChapter(it.copy(reason = null)); nav.popBackStack() },
-        onOpenBook = { vm.play(c.bookId, autoplay = false); nav.navigate("player/${c.bookId}") },
-        onPlay = { at -> vm.play(c.bookId, autoplay = true, at = at); nav.navigate("player/${c.bookId}") },
+        // Jump to the player the book already sits on, collapsing the chapters/editor screens so the
+        // player's down arrow returns to the list you came from, not back into the editor.
+        onOpenBook = {
+            vm.play(c.bookId, autoplay = false)
+            nav.navigate("player/${c.bookId}") { popUpTo("player/${c.bookId}") { inclusive = true }; launchSingleTop = true }
+        },
+        onPlay = { at ->
+            vm.play(c.bookId, autoplay = true, at = at)
+            nav.navigate("player/${c.bookId}") { popUpTo("player/${c.bookId}") { inclusive = true }; launchSingleTop = true }
+        },
         onEditChapter = { ch -> nav.navigate("editor/${ch.id}") { launchSingleTop = true } },
     )
 }
