@@ -30,6 +30,15 @@ import io.github.m0n0t0ne0ne.colophon.data.Book
 data class SeriesGroup(val name: String, val books: List<Book>) {
     val finished get() = books.count { it.finished }
     val author get() = books.firstOrNull { it.author.isNotBlank() }?.author.orEmpty()
+    val progress get() = seriesProgress(books)
+}
+
+/** How far through a whole series you are: time listened across its books over their total length. */
+fun seriesProgress(books: List<Book>): Float {
+    val total = books.sumOf { it.durationMs }
+    if (total <= 0L) return 0f
+    val done = books.sumOf { if (it.finished) it.durationMs else it.positionMs.coerceIn(0L, it.durationMs) }
+    return (done.toFloat() / total).coerceIn(0f, 1f)
 }
 
 fun groupSeries(books: List<Book>): List<SeriesGroup> =
@@ -200,9 +209,10 @@ private fun SeriesRow(group: SeriesGroup, onClick: () -> Unit) {
                     Cover(b, size, Modifier.offset(x = (index * 22).dp, y = (index * 3).dp), plain = index > 0)
                 }
             }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text(group.name, style = BookTitle, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text("${group.books.size} books · ${group.finished} finished", style = Small)
+                ThinProgress(group.progress)
             }
             Icon(Ic.Forward, null, tint = C.Muted, modifier = Modifier.size(18.dp))
         }
@@ -240,7 +250,14 @@ fun SeriesContent(
             }
         }
         Text(name, style = TitleLarge)
-        Text(listOfNotNull(author, "${books.size} books").joinToString(" · "), style = Small, modifier = Modifier.padding(top = 4.dp, bottom = 6.dp))
+        val finished = books.count { it.finished }
+        Text(
+            listOfNotNull(author, "${books.size} books", "$finished finished").joinToString(" · "),
+            style = Small, modifier = Modifier.padding(top = 4.dp, bottom = 10.dp),
+        )
+        val progress = seriesProgress(books)
+        ThinProgress(progress)
+        Text("${(progress * 100).toInt()}% through the series", style = Tiny, modifier = Modifier.padding(top = 6.dp, bottom = 14.dp))
         UnderlineTabs(listOf("Publication order", "Series order"), mode) { mode = it }
         LazyColumn(Modifier.fillMaxSize()) {
             items(ordered, key = { it.id }) { book ->

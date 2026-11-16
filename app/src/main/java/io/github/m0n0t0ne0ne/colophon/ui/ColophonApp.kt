@@ -173,18 +173,20 @@ private fun PlayerRoute(vm: AppViewModel, nav: NavHostController, id: Long) {
 
 @Composable
 private fun ChaptersRoute(vm: AppViewModel, nav: NavHostController, id: Long) {
+    val book by remember(id) { vm.bookFlow(id) }.collectAsStateWithLifecycle(null)
     val current by remember(id) { vm.chapters(id, ChapterSet.CURRENT) }.collectAsStateWithLifecycle(emptyList())
     val original by remember(id) { vm.chapters(id, ChapterSet.ORIGINAL) }.collectAsStateWithLifecycle(emptyList())
     val marks by remember(id) { vm.bookmarks(id) }.collectAsStateWithLifecycle(emptyList())
     val state by vm.hub.state.collectAsStateWithLifecycle()
+    val duration = book?.durationMs ?: state.durationMs
     ChaptersContent(
-        current, original, marks, state.positionMs, { nav.popBackStack() },
+        current, original, marks, state.positionMs, duration, { nav.popBackStack() },
         { at -> vm.play(id, true, at); nav.popBackStack() },
         { c -> nav.navigate("editor/${c.id}") },
-        { vm.addChapter(id, ChapterSet.CURRENT, state.positionMs) },
         { vm.resetChapters(id) },
         { w -> vm.padChapterNumbers(id, w) },
         vm::deleteBookmark,
+        vm::saveBookmarkNote,
     )
 }
 
@@ -195,19 +197,14 @@ private fun EditorRoute(vm: AppViewModel, nav: NavHostController, id: Long) {
     val c = chapter ?: return
     val book by remember(c.bookId) { vm.bookFlow(c.bookId) }.collectAsStateWithLifecycle(null)
     val siblings by remember(c.bookId, c.chapterSet) { vm.chapters(c.bookId, c.chapterSet) }.collectAsStateWithLifecycle(emptyList())
-    val previewing by vm.previewing.collectAsStateWithLifecycle()
-    val position = siblings.indexOfFirst { it.id == c.id }
-    DisposableEffect(id) { onDispose { vm.stopPreview() } }
+    val b = book ?: return
     EditorContent(
-        c, book?.durationMs ?: Long.MAX_VALUE, { nav.popBackStack() },
-        { at -> vm.startPreview(c.bookId, at) },
-        { vm.saveChapter(it.copy(reason = null)); nav.popBackStack() },
-        { vm.mergeWithNext(c); nav.popBackStack() },
-        { vm.deleteChapter(c.id); nav.popBackStack() },
-        { vm.mergeWithPrevious(c); nav.popBackStack() },
-        position > 0,
-        position in 0 until siblings.size - 1,
-        previewing, vm::stopPreview,
+        c, b, siblings,
+        onBack = { nav.popBackStack() },
+        onSave = { vm.saveChapter(it.copy(reason = null)); nav.popBackStack() },
+        onOpenBook = { vm.play(c.bookId, autoplay = false); nav.navigate("player/${c.bookId}") },
+        onPlay = { at -> vm.play(c.bookId, autoplay = true, at = at); nav.navigate("player/${c.bookId}") },
+        onEditChapter = { ch -> nav.navigate("editor/${ch.id}") { launchSingleTop = true } },
     )
 }
 

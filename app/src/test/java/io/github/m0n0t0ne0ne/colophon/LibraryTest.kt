@@ -134,7 +134,7 @@ class LibraryTest {
             db.version = 1
         }
         val room = Room.databaseBuilder(context, ColophonDatabase::class.java, "migrate.db")
-            .addMigrations(ColophonDatabase.MIGRATION_1_2, ColophonDatabase.MIGRATION_2_3, ColophonDatabase.MIGRATION_3_4, ColophonDatabase.MIGRATION_4_5).allowMainThreadQueries().build()
+            .addMigrations(ColophonDatabase.MIGRATION_1_2, ColophonDatabase.MIGRATION_2_3, ColophonDatabase.MIGRATION_3_4, ColophonDatabase.MIGRATION_4_5, ColophonDatabase.MIGRATION_5_6).allowMainThreadQueries().build()
         val book = room.dao().allBooks().single()
         assertEquals(500L, book.positionMs)
         assertFalse(book.userEdited)

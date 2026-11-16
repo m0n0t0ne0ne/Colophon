@@ -140,8 +140,8 @@ fun PlayerContent(
                 val heading = chapter?.let { ChapterHeading.of(it.title) }
                 if (heading?.name != null) {
                     Text(
-                        heading.label.uppercase(), maxLines = 1, overflow = TextOverflow.Ellipsis,
-                        style = Tiny.copy(color = OnArtSoft, letterSpacing = 1.8.sp, fontWeight = FontWeight.Medium),
+                        heading.label.uppercase(), maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
+                        style = Tiny.copy(color = OnArtSoft, letterSpacing = 1.8.sp, fontWeight = FontWeight.Medium, lineHeight = 15.sp),
                     )
                     Spacer(Modifier.height(10.dp))
                 }

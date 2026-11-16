@@ -241,6 +241,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun deleteBookmark(id: Long) { viewModelScope.launch { dao.deleteBookmark(id) } }
+    fun saveBookmarkNote(id: Long, note: String?) { viewModelScope.launch { dao.setBookmarkNote(id, note) } }
     fun saveChapter(chapter: Chapter) { viewModelScope.launch { dao.updateChapter(chapter) } }
 
     /** Zero-pads the numbers in every chapter title to [width] digits, e.g. "2 - Name" to "002 - Name". */

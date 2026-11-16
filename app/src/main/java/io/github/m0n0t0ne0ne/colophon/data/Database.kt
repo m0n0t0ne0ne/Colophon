@@ -59,6 +59,8 @@ data class Bookmark(
     val bookId: Long,
     val positionMs: Long,
     val createdAt: Long,
+    /** An optional note you can add to remember what the moment was. */
+    val note: String? = null,
 )
 
 /** Recent places in a book, kept so a mistaken tap on the timeline can be undone. */
@@ -117,6 +119,7 @@ interface LibraryDao {
     @Insert suspend fun insertBookmark(bookmark: Bookmark)
     @Query("SELECT * FROM Bookmark WHERE bookId = :id ORDER BY positionMs") fun bookmarks(id: Long): Flow<List<Bookmark>>
     @Query("DELETE FROM Bookmark WHERE id = :id") suspend fun deleteBookmark(id: Long)
+    @Query("UPDATE Bookmark SET note = :note WHERE id = :id") suspend fun setBookmarkNote(id: Long, note: String?)
 
     @Insert suspend fun insertHistory(entry: PositionHistory)
     @Query("SELECT * FROM PositionHistory WHERE bookId = :id ORDER BY at DESC LIMIT 1") suspend fun lastHistory(id: Long): PositionHistory?
@@ -132,7 +135,7 @@ interface LibraryDao {
     suspend fun trimHistory(id: Long)
 }
 
-@Database(entities = [Book::class, BookFile::class, Chapter::class, Bookmark::class, PositionHistory::class], version = 5, exportSchema = false)
+@Database(entities = [Book::class, BookFile::class, Chapter::class, Bookmark::class, PositionHistory::class], version = 6, exportSchema = false)
 abstract class ColophonDatabase : RoomDatabase() {
     abstract fun dao(): LibraryDao
 
@@ -162,10 +165,16 @@ abstract class ColophonDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE Bookmark ADD COLUMN note TEXT")
+            }
+        }
+
         @Volatile private var instance: ColophonDatabase? = null
         fun get(context: Context): ColophonDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(context.applicationContext, ColophonDatabase::class.java, "colophon.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                 .build().also { instance = it }
         }
     }

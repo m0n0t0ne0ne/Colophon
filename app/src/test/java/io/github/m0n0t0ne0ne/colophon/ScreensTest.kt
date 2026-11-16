@@ -90,12 +90,12 @@ class ScreensTest {
     @Test fun playerBlack() = player(BackgroundMode.Black, "player-black")
 
     @Test fun chaptersScreen() {
-        rule.setContent { ColophonTheme { ChaptersContent(chapters, chapters, emptyList(), 13 * hours, {}, {}, {}, {}, {}, {}, {}) } }
+        rule.setContent { ColophonTheme { ChaptersContent(chapters, chapters, emptyList(), 13 * hours, 30 * hours, {}, {}, {}, {}, {}, {}, { _, _ -> }) } }
         shoot("chapters")
     }
 
     @Test fun editorScreen() {
-        rule.setContent { ColophonTheme { EditorContent(chapters[6], 30 * hours, {}, {}, {}, {}, {}) } }
+        rule.setContent { ColophonTheme { EditorContent(chapters[6], sampleBooks()[2], chapters, {}, {}, {}, {}, {}) } }
         shoot("editor")
     }
 }
