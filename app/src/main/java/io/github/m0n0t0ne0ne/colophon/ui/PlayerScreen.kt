@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
@@ -145,10 +146,7 @@ fun PlayerContent(
                     )
                     Spacer(Modifier.height(10.dp))
                 }
-                Text(
-                    heading?.name ?: heading?.label ?: book.title, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis,
-                    style = TitleMedium.copy(color = OnArt, fontSize = 26.sp, lineHeight = 30.sp),
-                )
+                AutoTitle(heading?.name ?: heading?.label ?: book.title)
                 Spacer(Modifier.height(12.dp))
                 Text(book.title, style = Small.copy(color = OnArtSoft, fontSize = 14.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
@@ -251,6 +249,31 @@ fun PlayerContent(
             }
         }
     }
+}
+
+/**
+ * The chapter title. Starts at 26sp and steps the size down (never below 18sp) until the whole
+ * title fits within three lines, so long titles stay readable instead of truncating. Short titles
+ * are untouched. The text is drawn only once a size has settled, to avoid a flash while it fits.
+ */
+@Composable
+private fun AutoTitle(text: String) {
+    val maxSize = 26f
+    val minSize = 18f
+    var size by remember(text) { mutableFloatStateOf(maxSize) }
+    var settled by remember(text) { mutableStateOf(false) }
+    Text(
+        text,
+        textAlign = TextAlign.Center,
+        maxLines = 3,
+        overflow = TextOverflow.Ellipsis,
+        style = TitleMedium.copy(color = OnArt, fontSize = size.sp, lineHeight = (size * 1.15f).sp),
+        onTextLayout = { result ->
+            if (result.hasVisualOverflow && size > minSize) size = (size - 1f).coerceAtLeast(minSize)
+            else settled = true
+        },
+        modifier = Modifier.drawWithContent { if (settled) drawContent() },
+    )
 }
 
 @Composable
