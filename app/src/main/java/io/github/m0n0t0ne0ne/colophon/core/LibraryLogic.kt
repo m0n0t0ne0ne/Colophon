@@ -391,8 +391,10 @@ data class ChapterHeading(val label: String, val name: String?) {
             """^(?:chapter|ch\.?|part|book|section|volume|scene|track|episode|prologue|epilogue|introduction|intro|interlude|foreword|afterword)\b.*$""",
             RegexOption.IGNORE_CASE,
         )
-        // A colon, or a dash/en dash/em dash with a space on at least one side, so "Self-Portrait" stays whole.
-        private val SEPARATOR = Regex("""\s*[-–—]\s+|\s+[-–—]\s*|\s*:\s*""")
+        // A colon is an explicit, author-placed break.
+        private val COLON = Regex("""\s*:\s*""")
+        // A dash/en dash/em dash with a space on at least one side, so "Self-Portrait" stays whole.
+        private val DASH = Regex("""\s*[-–—]\s+|\s+[-–—]\s*""")
         // A bare chapter or track number: one to three digits, or zero-padded like "002" (not a 4-digit year).
         private val NUMBER = Regex("""0\d+|\d{1,3}""")
         // A number written out: "Seven", "Twenty-Two", "One Hundred and Five".
@@ -409,7 +411,14 @@ data class ChapterHeading(val label: String, val name: String?) {
 
         fun of(title: String): ChapterHeading {
             val clean = title.trim()
-            SEPARATOR.find(clean)?.let { m ->
+            // A colon always breaks: whatever's before it becomes the label line, whatever follows the name.
+            COLON.find(clean)?.let { m ->
+                val before = clean.substring(0, m.range.first).trim()
+                val after = clean.substring(m.range.last + 1).trim()
+                if (before.isNotEmpty() && after.isNotEmpty()) return ChapterHeading(before, after)
+            }
+            // A dash only breaks when the left side reads as a chapter label, so dashed titles stay whole.
+            DASH.find(clean)?.let { m ->
                 val before = clean.substring(0, m.range.first).trim()
                 val after = clean.substring(m.range.last + 1).trim()
                 if (after.isNotEmpty() && isLabel(before)) return ChapterHeading(before, after)

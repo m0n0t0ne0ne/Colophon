@@ -87,6 +87,9 @@ class ChapterPlayerTest {
         assertEquals("Chapter 16" to "Telling the Wheel", split("Chapter 16 Telling the Wheel"))
         assertEquals("Chapter Three" to "The Road", split("Chapter Three: The Road"))
         assertEquals("Prologue" to "Ablaze", split("Prologue: Ablaze"))
+        // A colon always breaks, even when the left side isn't a keyword or a number.
+        assertEquals("Foundation" to "Intro", split("Foundation: Intro"))
+        assertEquals("The Mule" to "A Reckoning", split("The Mule: A Reckoning"))
         // A number before the dash is the label, with no keyword needed.
         assertEquals("002" to "Death Cookie", split("002 - Death Cookie"))
         assertEquals("16" to "Scene Name", split("16 - Scene Name"))
