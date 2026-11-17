@@ -90,6 +90,16 @@ class ChapterPlayerTest {
         // A colon always breaks, even when the left side isn't a keyword or a number.
         assertEquals("Foundation" to "Intro", split("Foundation: Intro"))
         assertEquals("The Mule" to "A Reckoning", split("The Mule: A Reckoning"))
+        // Several colons: the leading segments join on the label line, the last segment is the title.
+        assertEquals("Part II · The Encyclopedists" to "Chapter 1", split("Part II: The Encyclopedists: Chapter 1"))
+        assertEquals(
+            "Part IV Epilogue · Something That the Dead Are Keeping Back" to "Chapter 19",
+            split("Part IV Epilogue: Something That the Dead Are Keeping Back: Chapter 19"),
+        )
+        assertEquals("Part 001" to "Chiba City Blues", split("Part 001: Chiba City Blues"))
+        // No colon: a bare number or lone chapter stays whole, as before.
+        assertEquals("001" to null, split("001"))
+        assertEquals("Chapter 1" to null, split("Chapter 1"))
         // A number before the dash is the label, with no keyword needed.
         assertEquals("002" to "Death Cookie", split("002 - Death Cookie"))
         assertEquals("16" to "Scene Name", split("16 - Scene Name"))

@@ -411,12 +411,10 @@ data class ChapterHeading(val label: String, val name: String?) {
 
         fun of(title: String): ChapterHeading {
             val clean = title.trim()
-            // A colon always breaks: whatever's before it becomes the label line, whatever follows the name.
-            COLON.find(clean)?.let { m ->
-                val before = clean.substring(0, m.range.first).trim()
-                val after = clean.substring(m.range.last + 1).trim()
-                if (before.isNotEmpty() && after.isNotEmpty()) return ChapterHeading(before, after)
-            }
+            // Colons are explicit, author-placed breaks. Split on every colon: the leading segments
+            // join (with " · ") into the label line, and the last segment is the title.
+            val parts = clean.split(COLON).map { it.trim() }.filter { it.isNotEmpty() }
+            if (parts.size >= 2) return ChapterHeading(parts.dropLast(1).joinToString(" · "), parts.last())
             // A dash only breaks when the left side reads as a chapter label, so dashed titles stay whole.
             DASH.find(clean)?.let { m ->
                 val before = clean.substring(0, m.range.first).trim()
