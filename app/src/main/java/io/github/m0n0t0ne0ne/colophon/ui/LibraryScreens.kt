@@ -111,7 +111,7 @@ fun LibraryContent(
             }
             if (tab != 1 && groups.isNotEmpty()) {
                 if (tab == 0) header("Series")
-                items(groups, span = { GridItemSpan(3) }) { SeriesRow(it) { onOpenSeries(it.name) } }
+                items(groups, span = { GridItemSpan(3) }) { SeriesRow(it, large = tab == 2) { onOpenSeries(it.name) } }
             }
             if (tab != 2 && standalone.isNotEmpty()) {
                 if (tab == 0) header("Standalone books")
@@ -196,17 +196,23 @@ private fun RemoveBookDialog(title: String, onDismiss: () -> Unit, onConfirm: ()
 }
 
 @Composable
-private fun SeriesRow(group: SeriesGroup, onClick: () -> Unit) {
+private fun SeriesRow(group: SeriesGroup, large: Boolean = false, onClick: () -> Unit) {
+    // On the Series tab the fan is larger, matching the Continue listening cover size (88dp).
+    val front = if (large) 88 else 72
+    val step = if (large) 7 else 6
+    val dx = if (large) 27 else 22
+    val dy = if (large) 4 else 3
+    val boxW = (dx * 2 + (front - step * 2)).dp
     Column {
         HorizontalDivider(color = C.Line)
         Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(18.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(104.dp, 72.dp)) {
+            Box(Modifier.size(boxW, front.dp)) {
                 // Front cover first: book 1, then 2, 3 fanned behind it.
                 val fan = group.books.sortedWith(compareBy<Book>({ it.seriesNumber ?: Double.MAX_VALUE }, { it.year ?: Int.MAX_VALUE }, { it.title })).take(3)
                 fan.reversed().forEachIndexed { i, b ->
                     val index = fan.size - 1 - i
-                    val size = (72 - index * 6).dp
-                    Cover(b, size, Modifier.offset(x = (index * 22).dp, y = (index * 3).dp), plain = index > 0)
+                    val size = (front - index * step).dp
+                    Cover(b, size, Modifier.offset(x = (index * dx).dp, y = (index * dy).dp), plain = index > 0)
                 }
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -287,7 +293,7 @@ private fun SeriesBookRow(book: Book, onOpen: () -> Unit, onEdit: () -> Unit, on
             Modifier.fillMaxWidth().combinedClickable(onClick = onOpen, onLongClick = { menu = true }, onLongClickLabel = "Book options").padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically,
         ) {
-            Cover(book, 56.dp, numberOnly = true, roman = roman)
+            Cover(book, 72.dp, numberOnly = true, roman = roman)
             Column(Modifier.weight(1f)) {
                 Text(book.title, style = BookTitle.copy(fontSize = 18.sp), maxLines = 2, overflow = TextOverflow.Ellipsis)
                 val meta = listOfNotNull(
