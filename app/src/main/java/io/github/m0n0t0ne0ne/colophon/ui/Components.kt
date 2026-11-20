@@ -173,7 +173,7 @@ private object CoverAccents {
 
 @Composable
 fun Cover(book: Book, size: Dp, modifier: Modifier = Modifier, numberOnly: Boolean = false, plain: Boolean = false, roman: Boolean = false, showFinished: Boolean = true) {
-    val shape = RoundedCornerShape(if (size < 80.dp) 3.dp else 4.dp)
+    val shape = RoundedCornerShape(0.dp)
     val path = book.coverPath
     // The finished cue: a cut corner in the book's accent. Shown everywhere a cover appears except the
     // player (showFinished = false there). Decorative fanned backs (plain) are skipped. The colour is
