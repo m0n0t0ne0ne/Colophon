@@ -131,7 +131,9 @@ class PlaybackService : MediaSessionService() {
                             .build()
                     }
                     val durations = bookFiles.map { it.durationMs }
-                    val start = if (book.finished) 0L else book.positionMs.coerceAtLeast(0)
+                    // Resume at the saved spot (for a finished book that's the end), never restart from
+                    // chapter one — the system resuming must not silently replay a completed book.
+                    val start = book.positionMs.coerceAtLeast(0)
                     val (index, offset) = Timeline.locate(durations, start)
                     MediaItemsWithStartPosition(items, index, offset)
                 }.fold({ future.set(it) }, { future.setException(it) })
@@ -162,8 +164,18 @@ class PlaybackService : MediaSessionService() {
             .build()
         raw = player
         RawPlayer.current = player
+        player.repeatMode = Player.REPEAT_MODE_OFF
         val chapterPlayer = ChapterPlayer(player)
         player.addListener(object : Player.Listener {
+            // A finished book stops at the end instead of looping back to chapter one. Pausing here
+            // also records the finished position so the cue and series progress stay correct.
+            override fun onPlaybackStateChanged(state: Int) {
+                if (state == Player.STATE_ENDED) {
+                    player.playWhenReady = false
+                    scope.launch { save(player) }
+                }
+            }
+
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 scope.launch { save(player) }
                 saver?.cancel()

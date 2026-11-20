@@ -5,19 +5,29 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import android.graphics.BitmapFactory
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathFillType
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -31,11 +41,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.palette.graphics.Palette
 import coil.compose.AsyncImage
 import io.github.m0n0t0ne0ne.colophon.R
 import io.github.m0n0t0ne0ne.colophon.core.Roman
 import io.github.m0n0t0ne0ne.colophon.data.Book
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 
 object C {
     val Ground = Color(0xFF0B0C0E)
@@ -127,18 +141,64 @@ fun IconBtn(icon: ImageVector, label: String, tint: Color = C.Text, onClick: () 
     }
 }
 
+/** The per-book finished-corner colour: the dog-ear override, else the progress override, else null (auto). */
+private fun cueOverride(ctx: android.content.Context, bookId: Long): Color? {
+    val prefs = ctx.getSharedPreferences("settings", android.content.Context.MODE_PRIVATE)
+    return when {
+        prefs.contains("dogear_$bookId") -> Color(prefs.getInt("dogear_$bookId", 0))
+        prefs.contains("accent_$bookId") -> Color(prefs.getInt("accent_$bookId", 0))
+        else -> null
+    }
+}
+
+/** Per-cover accent for the finished cue, derived like the player's and cached by file path. */
+private object CoverAccents {
+    private val cache = ConcurrentHashMap<String, Color>()
+    fun cached(path: String?): Color? = path?.let { cache[it] }
+    suspend fun get(path: String): Color = cache[path] ?: withContext(Dispatchers.Default) {
+        val color = runCatching {
+            val opts = BitmapFactory.Options().apply { inSampleSize = 8 }
+            val bmp = BitmapFactory.decodeFile(path, opts) ?: return@runCatching C.Accent
+            val p = Palette.from(bmp).maximumColorCount(16).generate()
+            val base = p.getVibrantColor(p.getLightVibrantColor(p.getDominantColor(C.Accent.toArgb())))
+            val hsv = FloatArray(3)
+            android.graphics.Color.colorToHSV(base, hsv)
+            hsv[2] = hsv[2].coerceAtLeast(0.72f); hsv[1] = (hsv[1] * 1.1f).coerceAtMost(1f)
+            Color(android.graphics.Color.HSVToColor(hsv))
+        }.getOrDefault(C.Accent)
+        cache[path] = color
+        color
+    }
+}
+
 @Composable
-fun Cover(book: Book, size: Dp, modifier: Modifier = Modifier, numberOnly: Boolean = false, plain: Boolean = false, roman: Boolean = false) {
+fun Cover(book: Book, size: Dp, modifier: Modifier = Modifier, numberOnly: Boolean = false, plain: Boolean = false, roman: Boolean = false, showFinished: Boolean = true) {
     val shape = RoundedCornerShape(if (size < 80.dp) 3.dp else 4.dp)
     val path = book.coverPath
+    // The finished cue: a cut corner in the book's accent. Shown everywhere a cover appears except the
+    // player (showFinished = false there). Decorative fanned backs (plain) are skipped. The colour is
+    // the dog-ear override, else the progress override, else the cover's own accent (all per book).
+    val ctx = LocalContext.current
+    val showCue = book.finished && showFinished && !plain
+    var cue by remember(path, showCue, book.id) { mutableStateOf(cueOverride(ctx, book.id) ?: CoverAccents.cached(path) ?: C.Accent) }
+    LaunchedEffect(path, showCue, book.id) {
+        if (showCue) cue = cueOverride(ctx, book.id) ?: (path?.let { CoverAccents.get(it) } ?: C.Accent)
+    }
+    val cueMod = if (showCue) Modifier.drawWithContent {
+        drawContent()
+        val f = this.size.minDimension * 0.26f
+        val w = this.size.width
+        val tri = Path().apply { moveTo(w - f, 0f); lineTo(w, 0f); lineTo(w, f); close() }
+        drawPath(tri, cue)
+    } else Modifier
     if (path != null && File(path).exists()) {
         AsyncImage(
             model = File(path), contentDescription = null, contentScale = ContentScale.Crop,
-            modifier = modifier.size(size).clip(shape).background(C.Surface),
+            modifier = modifier.size(size).clip(shape).background(C.Surface).then(cueMod),
         )
     } else {
         val tone = C.tones[((book.seriesNumber?.toInt() ?: book.id.toInt()).mod(C.tones.size))]
-        Box(modifier.size(size).clip(shape).background(tone).padding(if (size < 80.dp) 2.dp else 10.dp), contentAlignment = if (numberOnly) Alignment.Center else Alignment.BottomStart) {
+        Box(modifier.size(size).clip(shape).background(tone).then(cueMod).padding(if (size < 80.dp) 2.dp else 10.dp), contentAlignment = if (numberOnly) Alignment.Center else Alignment.BottomStart) {
             val number = book.seriesNumber?.let { if (it == 0.0) "P" else Roman.bookNumber(it, roman) }
             if (plain) {
                 Spacer(Modifier.size(1.dp))

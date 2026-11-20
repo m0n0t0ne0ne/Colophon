@@ -327,6 +327,7 @@ fun DetailsScreen(
     onRemove: () -> Unit,
     onViewTags: () -> Unit = {},
     onReload: () -> Unit = {},
+    onMarkUnfinished: () -> Unit = {},
     romanSeries: Set<String> = emptySet(),
     onSeriesRoman: (String, Boolean) -> Unit = { _, _ -> },
 ) {
@@ -376,6 +377,10 @@ fun DetailsScreen(
             SecondaryButton("View file tags", Modifier.fillMaxWidth()) { onViewTags() }
             SecondaryButton("Reload from file", Modifier.fillMaxWidth()) { onReload() }
             Text("Replaces these details, the cover and the chapters with what the file says.", style = Tiny)
+            if (book.finished) {
+                SecondaryButton("Mark as unfinished", Modifier.fillMaxWidth()) { onMarkUnfinished(); onBack() }
+                Text("Removes the finished corner and resets this book's progress to the start.", style = Tiny)
+            }
             TextButton(onClick = { confirm = true }) { Text("Remove from library", color = C.Warn) }
             Text("This removes the book from Colophon. Your audio file stays on your phone.", style = Tiny)
         }

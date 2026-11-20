@@ -68,6 +68,7 @@ data class PlayerActions(
     val onMode: (BackgroundMode) -> Unit = {},
     val onStrength: (Float) -> Unit = {},
     val onAccent: (Color?) -> Unit = {},
+    val onDogear: (Color?) -> Unit = {},
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -80,6 +81,7 @@ fun PlayerContent(
     strength: Float,
     colors: ArtColors,
     accentChoice: Color?,
+    dogearChoice: Color?,
     romanNumber: Boolean,
     jumps: List<Long>,
     actions: PlayerActions,
@@ -133,7 +135,7 @@ fun PlayerContent(
 
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 BoxWithConstraints {
-                    Cover(book, minOf(maxWidth, maxHeight))
+                    Cover(book, minOf(maxWidth, maxHeight), showFinished = false)
                 }
             }
 
@@ -222,6 +224,18 @@ fun PlayerContent(
                     val set = if (trueTone) colors.swatchesVivid else colors.swatchesSoft
                     set.forEach { c ->
                         ColorDot(c, selected = accentChoice?.toArgb() == c.toArgb()) { actions.onAccent(c) }
+                    }
+                }
+                Text("Finished corner colour", style = Small, modifier = Modifier.padding(top = 8.dp))
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    // Auto (A) follows the progress colour; the swatches let you pick a more readable one.
+                    ColorDot(accent, selected = dogearChoice == null, label = "A") { actions.onDogear(null) }
+                    val set = if (trueTone) colors.swatchesVivid else colors.swatchesSoft
+                    set.forEach { c ->
+                        ColorDot(c, selected = dogearChoice?.toArgb() == c.toArgb()) { actions.onDogear(c) }
                     }
                 }
             }

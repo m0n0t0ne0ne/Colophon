@@ -325,6 +325,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Manually clear a book's finished mark: removes the cue and resets its progress to the start. */
+    fun removeFinished(bookId: Long) {
+        viewModelScope.launch {
+            if (hub.state.value.bookId == bookId) hub.forget(bookId)
+            dao.clearFinished(bookId)
+        }
+    }
+
     private suspend fun removeBookNow(bookId: Long) {
         hub.forget(bookId)
         val cover = dao.book(bookId)?.coverPath
@@ -398,6 +406,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setAccent(bookId: Long, color: Color?) {
         accentOverride.value = color
         prefs.edit().apply { if (color == null) remove("accent_$bookId") else putInt("accent_$bookId", color.toArgb()) }.apply()
+    }
+
+    /** The finished-corner colour, chosen in the player. Null means auto — follow the progress colour. */
+    val dogearOverride = MutableStateFlow<Color?>(null)
+
+    fun loadDogear(bookId: Long) {
+        dogearOverride.value = if (prefs.contains("dogear_$bookId")) Color(prefs.getInt("dogear_$bookId", 0)) else null
+    }
+
+    fun setDogear(bookId: Long, color: Color?) {
+        dogearOverride.value = color
+        prefs.edit().apply { if (color == null) remove("dogear_$bookId") else putInt("dogear_$bookId", color.toArgb()) }.apply()
     }
 }
 

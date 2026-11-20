@@ -88,8 +88,11 @@ interface LibraryDao {
     @Update suspend fun update(book: Book)
     @Query("DELETE FROM Book WHERE id = :id") suspend fun deleteBook(id: Long)
 
-    @Query("UPDATE Book SET positionMs = :pos, lastPlayedAt = :at, finished = :finished WHERE id = :id")
+    // Finished is sticky: reaching the end sets it, but replaying never clears it. Only an explicit
+    // "mark as unfinished" (clearFinished) resets it, so the finished cue and series progress persist.
+    @Query("UPDATE Book SET positionMs = :pos, lastPlayedAt = :at, finished = (finished OR :finished) WHERE id = :id")
     suspend fun savePosition(id: Long, pos: Long, at: Long, finished: Boolean)
+    @Query("UPDATE Book SET finished = 0, positionMs = 0 WHERE id = :id") suspend fun clearFinished(id: Long)
     @Query("UPDATE Book SET hiddenFromContinue = :hidden WHERE id = :id") suspend fun setHidden(id: Long, hidden: Boolean)
     @Query("UPDATE Book SET analyzedAt = :at WHERE id = :id") suspend fun setAnalyzedAt(id: Long, at: Long)
     @Query("UPDATE Book SET speed = :speed WHERE id = :id") suspend fun saveSpeed(id: Long, speed: Float)
