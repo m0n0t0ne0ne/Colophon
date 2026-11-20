@@ -79,7 +79,7 @@ class ScreensTest {
         val colors = ArtColors(Color(0xFF6B3A28), Color(0xFFF0A868), swatches, swatches)
         rule.setContent {
             ColophonTheme {
-                PlayerContent(book, PlayerState(bookId = 3, positionMs = 23 * hours, durationMs = 30 * hours, playing = true), chapters, mode, 0.6f, colors, null, null, false, emptyList(), PlayerActions())
+                PlayerContent(book, PlayerState(bookId = 3, positionMs = 23 * hours, durationMs = 30 * hours, playing = true), chapters, mode, 0.6f, colors, null, null, 0.6f, false, emptyList(), PlayerActions())
             }
         }
         shoot(name)
@@ -89,6 +89,18 @@ class ScreensTest {
     @Test fun playerColor() = player(BackgroundMode.Color, "player-color")
     @Test fun playerBlack() = player(BackgroundMode.Black, "player-black")
 
+    @Test fun playerFinished() {
+        val book = sampleBooks()[2].copy(finished = true)
+        val swatches = listOf(Color(0xFFF0A868), Color(0xFFE8604C), Color(0xFF9CC2DE), Color(0xFFBFA98C))
+        val colors = ArtColors(Color(0xFF6B3A28), Color(0xFFF0A868), swatches, swatches)
+        rule.setContent {
+            ColophonTheme {
+                PlayerContent(book, PlayerState(bookId = 3, positionMs = 23 * hours, durationMs = 30 * hours, playing = true), chapters, BackgroundMode.Art, 0.6f, colors, null, null, 0.6f, false, emptyList(), PlayerActions())
+            }
+        }
+        shoot("player-finished")
+    }
+
     @Test fun playerLongTitle() {
         val book = sampleBooks()[2]
         val long = listOf(Chapter(id = 99, bookId = 3, chapterSet = "current", startMs = 0,
@@ -97,7 +109,7 @@ class ScreensTest {
         val colors = ArtColors(Color(0xFF6B3A28), Color(0xFFF0A868), swatches, swatches)
         rule.setContent {
             ColophonTheme {
-                PlayerContent(book, PlayerState(bookId = 3, positionMs = 2 * hours, durationMs = 30 * hours, playing = true), long, BackgroundMode.Art, 0.6f, colors, null, null, false, emptyList(), PlayerActions())
+                PlayerContent(book, PlayerState(bookId = 3, positionMs = 2 * hours, durationMs = 30 * hours, playing = true), long, BackgroundMode.Art, 0.6f, colors, null, null, 0.6f, false, emptyList(), PlayerActions())
             }
         }
         shoot("player-longtitle")

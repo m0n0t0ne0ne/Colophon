@@ -419,6 +419,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         dogearOverride.value = color
         prefs.edit().apply { if (color == null) remove("dogear_$bookId") else putInt("dogear_$bookId", color.toArgb()) }.apply()
     }
+
+    /** The finished-mark opacity (0..1), chosen per book with the player's slider. */
+    val dogearOpacity = MutableStateFlow(0.6f)
+
+    fun loadDogearOpacity(bookId: Long) {
+        dogearOpacity.value = prefs.getInt("dogearOpacity_$bookId", 60) / 100f
+    }
+
+    fun setDogearOpacity(bookId: Long, value: Float) {
+        dogearOpacity.value = value
+        prefs.edit().putInt("dogearOpacity_$bookId", (value * 100).toInt()).apply()
+    }
 }
 
 data class TagRow(val label: String, val value: String)

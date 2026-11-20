@@ -141,7 +141,7 @@ fun IconBtn(icon: ImageVector, label: String, tint: Color = C.Text, onClick: () 
     }
 }
 
-/** The per-book finished-corner colour: the dog-ear override, else the progress override, else null (auto). */
+/** The per-book finished-mark colour: the chosen override, else the progress override, else null (auto). */
 private fun cueOverride(ctx: android.content.Context, bookId: Long): Color? {
     val prefs = ctx.getSharedPreferences("settings", android.content.Context.MODE_PRIVATE)
     return when {
@@ -149,6 +149,29 @@ private fun cueOverride(ctx: android.content.Context, bookId: Long): Color? {
         prefs.contains("accent_$bookId") -> Color(prefs.getInt("accent_$bookId", 0))
         else -> null
     }
+}
+
+/** The per-book finished-mark opacity (0..1), default 60%. */
+private fun cueOpacityPref(ctx: android.content.Context, bookId: Long): Float =
+    ctx.getSharedPreferences("settings", android.content.Context.MODE_PRIVATE).getInt("dogearOpacity_$bookId", 60) / 100f
+
+/** Draws the Colophon bookmark hanging from the top edge, tucked into the top-right corner. */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawFinishedMark(color: Color, alpha: Float) {
+    val m = size.minDimension
+    val w = m * 0.17f
+    val h = m * 0.30f
+    val notch = h * 0.22f
+    val right = size.width - m * 0.05f
+    val left = right - w
+    val mark = Path().apply {
+        moveTo(left, 0f); lineTo(right, 0f); lineTo(right, h)
+        lineTo((left + right) / 2f, h - notch); lineTo(left, h); close()
+        // The play-triangle cutout from the app mark, left fully transparent so the art shows through.
+        val px = left + w * 0.32f; val py = h * 0.40f; val tw = w * 0.40f; val th = h * 0.15f
+        moveTo(px, py - th); lineTo(px + tw, py); lineTo(px, py + th); close()
+        fillType = PathFillType.EvenOdd
+    }
+    drawPath(mark, color, alpha = alpha.coerceIn(0.1f, 1f))
 }
 
 /** Per-cover accent for the finished cue, derived like the player's and cached by file path. */
@@ -172,24 +195,24 @@ private object CoverAccents {
 }
 
 @Composable
-fun Cover(book: Book, size: Dp, modifier: Modifier = Modifier, numberOnly: Boolean = false, plain: Boolean = false, roman: Boolean = false, showFinished: Boolean = true) {
+fun Cover(book: Book, size: Dp, modifier: Modifier = Modifier, numberOnly: Boolean = false, plain: Boolean = false, roman: Boolean = false, showFinished: Boolean = true, cueColor: Color? = null, cueOpacity: Float? = null) {
     val shape = RoundedCornerShape(0.dp)
     val path = book.coverPath
-    // The finished cue: a cut corner in the book's accent. Shown everywhere a cover appears except the
-    // player (showFinished = false there). Decorative fanned backs (plain) are skipped. The colour is
-    // the dog-ear override, else the progress override, else the cover's own accent (all per book).
+    // The finished mark: a translucent Colophon bookmark hanging from the top-right corner, shown on
+    // every cover of a finished book. Decorative fanned backs (plain) are skipped. Colour and opacity
+    // come from explicit overrides (the player's live picker/slider) or, elsewhere, from the per-book
+    // preferences, falling back to the cover's own accent and 60%.
     val ctx = LocalContext.current
     val showCue = book.finished && showFinished && !plain
-    var cue by remember(path, showCue, book.id) { mutableStateOf(cueOverride(ctx, book.id) ?: CoverAccents.cached(path) ?: C.Accent) }
+    var resolved by remember(path, showCue, book.id) { mutableStateOf(cueOverride(ctx, book.id) ?: CoverAccents.cached(path) ?: C.Accent) }
     LaunchedEffect(path, showCue, book.id) {
-        if (showCue) cue = cueOverride(ctx, book.id) ?: (path?.let { CoverAccents.get(it) } ?: C.Accent)
+        if (showCue && cueColor == null) resolved = cueOverride(ctx, book.id) ?: (path?.let { CoverAccents.get(it) } ?: C.Accent)
     }
+    val ribbonColor = cueColor ?: resolved
+    val ribbonAlpha = cueOpacity ?: cueOpacityPref(ctx, book.id)
     val cueMod = if (showCue) Modifier.drawWithContent {
         drawContent()
-        val f = this.size.minDimension * 0.26f
-        val w = this.size.width
-        val tri = Path().apply { moveTo(w - f, 0f); lineTo(w, 0f); lineTo(w, f); close() }
-        drawPath(tri, cue)
+        drawFinishedMark(ribbonColor, ribbonAlpha)
     } else Modifier
     if (path != null && File(path).exists()) {
         AsyncImage(

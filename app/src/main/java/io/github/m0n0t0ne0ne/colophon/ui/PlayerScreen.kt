@@ -69,6 +69,7 @@ data class PlayerActions(
     val onStrength: (Float) -> Unit = {},
     val onAccent: (Color?) -> Unit = {},
     val onDogear: (Color?) -> Unit = {},
+    val onDogearOpacity: (Float) -> Unit = {},
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -82,6 +83,7 @@ fun PlayerContent(
     colors: ArtColors,
     accentChoice: Color?,
     dogearChoice: Color?,
+    dogearOpacity: Float,
     romanNumber: Boolean,
     jumps: List<Long>,
     actions: PlayerActions,
@@ -135,7 +137,7 @@ fun PlayerContent(
 
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 BoxWithConstraints {
-                    Cover(book, minOf(maxWidth, maxHeight), showFinished = false)
+                    Cover(book, minOf(maxWidth, maxHeight), cueColor = dogearChoice ?: accent, cueOpacity = dogearOpacity)
                 }
             }
 
@@ -226,18 +228,30 @@ fun PlayerContent(
                         ColorDot(c, selected = accentChoice?.toArgb() == c.toArgb()) { actions.onAccent(c) }
                     }
                 }
-                Text("Finished corner colour", style = Small, modifier = Modifier.padding(top = 8.dp))
+                Text("Finished mark", style = Small, modifier = Modifier.padding(top = 8.dp))
+                val cream = Color(0xFFEDE8DC)
+                val smoke = Color(0xFF26262A)
                 Row(
                     Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    // Auto (A) follows the progress colour; the swatches let you pick a more readable one.
+                    // Auto (A) follows the progress colour; cream/smoke and the cover swatches are fixed picks.
                     ColorDot(accent, selected = dogearChoice == null, label = "A") { actions.onDogear(null) }
+                    ColorDot(cream, selected = dogearChoice?.toArgb() == cream.toArgb()) { actions.onDogear(cream) }
+                    ColorDot(smoke, selected = dogearChoice?.toArgb() == smoke.toArgb()) { actions.onDogear(smoke) }
                     val set = if (trueTone) colors.swatchesVivid else colors.swatchesSoft
                     set.forEach { c ->
                         ColorDot(c, selected = dogearChoice?.toArgb() == c.toArgb()) { actions.onDogear(c) }
                     }
                 }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Opacity", style = Small)
+                    Text("${(dogearOpacity * 100).toInt()}%", style = Small)
+                }
+                Slider(
+                    dogearOpacity, actions.onDogearOpacity, valueRange = 0.2f..1f,
+                    colors = SliderDefaults.colors(thumbColor = OnArt, activeTrackColor = OnArt, inactiveTrackColor = C.Border),
+                )
             }
             "sleep" -> Sheet("Sleep timer", { sheet = null }) {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {

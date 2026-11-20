@@ -143,16 +143,18 @@ private fun PlayerRoute(vm: AppViewModel, nav: NavHostController, id: Long) {
     val strength by vm.backgroundStrength.collectAsStateWithLifecycle()
     val accentOverride by vm.accentOverride.collectAsStateWithLifecycle()
     val dogearOverride by vm.dogearOverride.collectAsStateWithLifecycle()
+    val dogearOpacity by vm.dogearOpacity.collectAsStateWithLifecycle()
     val romanSeries by vm.romanSeries.collectAsStateWithLifecycle()
     val b = book ?: return
     var colors by remember { mutableStateOf(ArtColors(C.Raised, C.Accent)) }
     LaunchedEffect(b.coverPath) { colors = vm.artColors(b.coverPath) }
     LaunchedEffect(id) { vm.loadAccent(id) }
     LaunchedEffect(id) { vm.loadDogear(id) }
+    LaunchedEffect(id) { vm.loadDogearOpacity(id) }
     LaunchedEffect(id) { if (vm.hub.state.value.bookId != id) vm.play(id, autoplay = false) }
     val shown = if (state.bookId == id) state else state.copy(positionMs = b.positionMs, durationMs = b.durationMs, playing = false, speed = b.speed)
     PlayerContent(
-        b, shown, chapters, mode, strength, colors, accentOverride, dogearOverride, b.series in romanSeries, history.map { it.positionMs },
+        b, shown, chapters, mode, strength, colors, accentOverride, dogearOverride, dogearOpacity, b.series in romanSeries, history.map { it.positionMs },
         PlayerActions(
             onBack = { nav.popBackStack() },
             onSeries = { b.series?.let { nav.navigate("series/${Uri.encode(it)}") } },
@@ -170,6 +172,7 @@ private fun PlayerRoute(vm: AppViewModel, nav: NavHostController, id: Long) {
             onStrength = vm::setStrength,
             onAccent = { vm.setAccent(id, it) },
             onDogear = { vm.setDogear(id, it) },
+            onDogearOpacity = { vm.setDogearOpacity(id, it) },
         ),
     )
 }
