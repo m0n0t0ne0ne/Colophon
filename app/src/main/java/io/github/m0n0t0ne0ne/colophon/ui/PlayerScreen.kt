@@ -1,13 +1,18 @@
 package io.github.m0n0t0ne0ne.colophon.ui
 
 import android.os.Build
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,6 +25,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
@@ -33,12 +40,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import kotlin.math.roundToInt
 import coil.request.ImageRequest
 import io.github.m0n0t0ne0ne.colophon.core.ChapterHeading
 import io.github.m0n0t0ne0ne.colophon.core.Roman
@@ -92,6 +103,10 @@ fun PlayerContent(
     var dragging by remember { mutableStateOf<Float?>(null) }
     var menu by remember { mutableStateOf(false) }
     var sleepCustom by remember { mutableStateOf("") }
+    var zoomed by remember { mutableStateOf(false) }
+    var coverBounds by remember { mutableStateOf(Rect.Zero) }
+    var rootSize by remember { mutableStateOf(IntSize.Zero) }
+    val zoomProgress by animateFloatAsState(if (zoomed) 1f else 0f, tween(360), label = "coverZoom")
 
     val position = state.positionMs
     val duration = state.durationMs.coerceAtLeast(1)
@@ -105,7 +120,7 @@ fun PlayerContent(
     val autoAccent = if (mode == BackgroundMode.Black) C.Accent else colors.accent
     val accent = accentChoice ?: autoAccent
 
-    Box(Modifier.fillMaxSize().background(C.Ground)) {
+    Box(Modifier.fillMaxSize().background(C.Ground).onSizeChanged { rootSize = it }) {
         Backdrop(book, mode, strength, colors)
 
         Column(Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -137,7 +152,15 @@ fun PlayerContent(
 
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 BoxWithConstraints {
-                    Cover(book, minOf(maxWidth, maxHeight), cueColor = dogearChoice ?: accent, cueOpacity = dogearOpacity)
+                    // Tapping the art opens a full-screen zoom. Hide the resting cover while it's open so
+                    // only the zoomed copy shows.
+                    val tap = if (book.coverPath != null) {
+                        Modifier
+                            .onGloballyPositioned { coverBounds = it.boundsInRoot() }
+                            .clickable(remember { MutableInteractionSource() }, indication = null) { zoomed = true }
+                            .graphicsLayer { alpha = if (zoomProgress > 0.02f) 0f else 1f }
+                    } else Modifier
+                    Cover(book, minOf(maxWidth, maxHeight), modifier = tap, cueColor = dogearChoice ?: accent, cueOpacity = dogearOpacity)
                 }
             }
 
@@ -197,6 +220,36 @@ fun PlayerContent(
                 Tool(state.sleepLeftMs?.let { formatClock(it) } ?: "Sleep", Modifier.weight(1f), Ic.Moon) { sheet = "sleep" }
                 Tool("Bookmark", Modifier.weight(1f), Ic.Bookmark, onClick = actions.onBookmark)
                 Tool("Backdrop", Modifier.weight(1f), Ic.Picture) { sheet = "background" }
+            }
+        }
+
+        // Full-screen cover zoom: the art grows from its resting spot to fit the screen width over a
+        // translucent black scrim. Tap anywhere or swipe down to close.
+        if (zoomProgress > 0.001f && book.coverPath != null && rootSize.width > 0) {
+            BackHandler(enabled = zoomed) { zoomed = false }
+            val density = LocalDensity.current
+            val w = rootSize.width.toFloat()
+            val h = rootSize.height.toFloat()
+            val target = Rect(0f, (h - w) / 2f, w, (h + w) / 2f)
+            val r = lerp(coverBounds, target, zoomProgress)
+            Box(
+                Modifier.fillMaxSize()
+                    .pointerInput(Unit) { detectTapGestures { zoomed = false } }
+                    .pointerInput(Unit) {
+                        var dy = 0f
+                        detectVerticalDragGestures(
+                            onDragEnd = { if (dy > 120f) zoomed = false; dy = 0f },
+                            onVerticalDrag = { _, d -> dy += d },
+                        )
+                    },
+            ) {
+                Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.9f * zoomProgress)))
+                AsyncImage(
+                    model = File(book.coverPath!!), contentDescription = null, contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .offset { IntOffset(r.left.roundToInt(), r.top.roundToInt()) }
+                        .size(with(density) { r.width.toDp() }, with(density) { r.height.toDp() }),
+                )
             }
         }
 

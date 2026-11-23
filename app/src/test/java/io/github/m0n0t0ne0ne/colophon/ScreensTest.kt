@@ -2,6 +2,8 @@ package io.github.m0n0t0ne0ne.colophon
 
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.click
 import com.github.takahirom.roborazzi.captureRoboImage
 import io.github.m0n0t0ne0ne.colophon.data.Book
 import io.github.m0n0t0ne0ne.colophon.data.Chapter
@@ -88,6 +90,20 @@ class ScreensTest {
     @Test fun playerArt() = player(BackgroundMode.Art, "player-art")
     @Test fun playerColor() = player(BackgroundMode.Color, "player-color")
     @Test fun playerBlack() = player(BackgroundMode.Black, "player-black")
+
+    @Test fun playerZoom() {
+        val book = sampleBooks()[2]
+        val swatches = listOf(Color(0xFFF0A868), Color(0xFFE8604C), Color(0xFF9CC2DE), Color(0xFFBFA98C))
+        val colors = ArtColors(Color(0xFF6B3A28), Color(0xFFF0A868), swatches, swatches)
+        rule.setContent {
+            ColophonTheme {
+                PlayerContent(book, PlayerState(bookId = 3, positionMs = 23 * hours, durationMs = 30 * hours, playing = true), chapters, BackgroundMode.Art, 0.6f, colors, null, null, 0.6f, false, emptyList(), PlayerActions())
+            }
+        }
+        rule.waitForIdle()
+        rule.onRoot().performTouchInput { click(androidx.compose.ui.geometry.Offset(center.x, height * 0.42f)) }
+        shoot("player-zoom")
+    }
 
     @Test fun playerFinished() {
         val book = sampleBooks()[2].copy(finished = true)
