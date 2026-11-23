@@ -1,9 +1,11 @@
 package io.github.m0n0t0ne0ne.colophon.ui
 
+import android.graphics.BitmapFactory
 import android.os.Build
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.Canvas
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -31,8 +33,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
@@ -55,6 +59,8 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 import coil.request.ImageRequest
 import io.github.m0n0t0ne0ne.colophon.core.ChapterHeading
@@ -113,6 +119,21 @@ fun PlayerContent(
     var coverBounds by remember { mutableStateOf(Rect.Zero) }
     var rootSize by remember { mutableStateOf(IntSize.Zero) }
     val zoomProgress by animateFloatAsState(if (zoomed) 1f else 0f, tween(360), label = "coverZoom")
+    // Decode the cover once up front so the zoom never waits on an image load mid-animation.
+    var fullArt by remember(book.coverPath) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(book.coverPath) {
+        fullArt = book.coverPath?.let { p ->
+            withContext(Dispatchers.Default) {
+                runCatching {
+                    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    BitmapFactory.decodeFile(p, bounds)
+                    var sample = 1
+                    while (maxOf(bounds.outWidth, bounds.outHeight) / sample > 2048) sample *= 2
+                    BitmapFactory.decodeFile(p, BitmapFactory.Options().apply { inSampleSize = sample })?.asImageBitmap()
+                }.getOrNull()
+            }
+        }
+    }
 
     val position = state.positionMs
     val duration = state.durationMs.coerceAtLeast(1)
@@ -236,8 +257,9 @@ fun PlayerContent(
             val density = LocalDensity.current
             val w = rootSize.width.toFloat()
             val h = rootSize.height.toFloat()
+            // The art always lays out at the full-width target square; the move from the resting cover
+            // is a pure graphicsLayer transform, so the whole animation runs on the GPU with no layout.
             val target = Rect(0f, (h - w) / 2f, w, (h + w) / 2f)
-            val r = lerp(coverBounds, target, zoomProgress)
             var scale by remember { mutableFloatStateOf(1f) }
             var pan by remember { mutableStateOf(Offset.Zero) }
             var dismiss by remember { mutableFloatStateOf(0f) }
@@ -273,26 +295,31 @@ fun PlayerContent(
             ) {
                 val fade = (1f - (dismiss / 600f)).coerceIn(0.3f, 1f)
                 Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.9f * zoomProgress * fade)))
-                AsyncImage(
-                    model = File(book.coverPath!!), contentDescription = null, contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .offset { IntOffset(r.left.roundToInt(), r.top.roundToInt()) }
-                        .size(with(density) { r.width.toDp() }, with(density) { r.height.toDp() })
+                // Interpolate the cover's resting rect -> full-width target purely via scale + translation.
+                val startScale = if (target.width > 0f) coverBounds.width / target.width else 1f
+                Box(
+                    Modifier
+                        .offset { IntOffset(target.left.roundToInt(), target.top.roundToInt()) }
+                        .size(with(density) { target.width.toDp() }, with(density) { target.height.toDp() })
                         .graphicsLayer {
-                            scaleX = scale; scaleY = scale
-                            translationX = pan.x; translationY = pan.y + dismiss
+                            transformOrigin = TransformOrigin.Center
+                            val flip = startScale + (1f - startScale) * zoomProgress
+                            scaleX = flip * scale; scaleY = flip * scale
+                            translationX = (1f - zoomProgress) * (coverBounds.center.x - target.center.x) + pan.x
+                            translationY = (1f - zoomProgress) * (coverBounds.center.y - target.center.y) + pan.y + dismiss
                             alpha = fade
                         },
-                )
-                // The finished bookmark rides the zooming art and fades out as it enlarges, fading back
-                // in on the way home — so it never snaps on or off.
-                if (book.finished && zoomProgress < 0.999f && scale <= 1.01f) {
-                    Canvas(
-                        Modifier
-                            .offset { IntOffset(r.left.roundToInt(), r.top.roundToInt()) }
-                            .size(with(density) { r.width.toDp() }, with(density) { r.height.toDp() })
-                            .graphicsLayer { translationY = dismiss; alpha = fade },
-                    ) { drawFinishedMark(dogearChoice ?: accent, dogearOpacity * (1f - zoomProgress)) }
+                ) {
+                    val art = fullArt
+                    if (art != null) {
+                        Image(bitmap = art, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.matchParentSize())
+                    } else {
+                        AsyncImage(model = File(book.coverPath!!), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.matchParentSize())
+                    }
+                    // The finished bookmark rides the art and fades out as it enlarges, back in on the way home.
+                    if (book.finished) {
+                        Canvas(Modifier.matchParentSize()) { drawFinishedMark(dogearChoice ?: accent, dogearOpacity * (1f - zoomProgress)) }
+                    }
                 }
             }
         }
