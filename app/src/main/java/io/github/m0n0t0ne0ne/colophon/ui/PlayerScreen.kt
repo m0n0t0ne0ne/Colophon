@@ -10,9 +10,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.Color
@@ -40,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
@@ -224,7 +229,7 @@ fun PlayerContent(
         }
 
         // Full-screen cover zoom: the art grows from its resting spot to fit the screen width over a
-        // translucent black scrim. Tap anywhere or swipe down to close.
+        // translucent black scrim. Pinch to zoom in and pan; tap, swipe down, or press back to close.
         if (zoomProgress > 0.001f && book.coverPath != null && rootSize.width > 0) {
             BackHandler(enabled = zoomed) { zoomed = false }
             val density = LocalDensity.current
@@ -232,23 +237,51 @@ fun PlayerContent(
             val h = rootSize.height.toFloat()
             val target = Rect(0f, (h - w) / 2f, w, (h + w) / 2f)
             val r = lerp(coverBounds, target, zoomProgress)
+            var scale by remember { mutableFloatStateOf(1f) }
+            var pan by remember { mutableStateOf(Offset.Zero) }
+            var dismiss by remember { mutableFloatStateOf(0f) }
+            // Reset the pinch state each time the view opens.
+            LaunchedEffect(zoomed) { if (zoomed) { scale = 1f; pan = Offset.Zero; dismiss = 0f } }
+            fun clampPan() {
+                val limit = (scale - 1f) * w / 2f
+                pan = Offset(pan.x.coerceIn(-limit, limit), pan.y.coerceIn(-limit, limit))
+            }
             Box(
                 Modifier.fillMaxSize()
-                    .pointerInput(Unit) { detectTapGestures { zoomed = false } }
                     .pointerInput(Unit) {
-                        var dy = 0f
-                        detectVerticalDragGestures(
-                            onDragEnd = { if (dy > 120f) zoomed = false; dy = 0f },
-                            onVerticalDrag = { _, d -> dy += d },
+                        detectTapGestures(
+                            onTap = { if (scale > 1.01f) { scale = 1f; pan = Offset.Zero } else zoomed = false },
+                            onDoubleTap = { if (scale > 1.01f) { scale = 1f; pan = Offset.Zero } else scale = 2.5f },
                         )
+                    }
+                    .pointerInput(Unit) {
+                        // One handler for pinch-zoom, pan while zoomed, and swipe-down-to-dismiss while not.
+                        awaitEachGesture {
+                            awaitFirstDown(requireUnconsumed = false)
+                            do {
+                                val e = awaitPointerEvent()
+                                val zoom = e.calculateZoom()
+                                val move = e.calculatePan()
+                                if (zoom != 1f) { scale = (scale * zoom).coerceIn(1f, 5f); clampPan() }
+                                if (scale > 1.01f) { pan += move; clampPan() } else { dismiss = (dismiss + move.y).coerceAtLeast(0f) }
+                                if (e.changes.any { it.positionChanged() }) e.changes.forEach { it.consume() }
+                            } while (e.changes.any { it.pressed })
+                            if (scale <= 1.01f) { if (dismiss > 140f) zoomed = false; dismiss = 0f }
+                        }
                     },
             ) {
-                Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.9f * zoomProgress)))
+                val fade = (1f - (dismiss / 600f)).coerceIn(0.3f, 1f)
+                Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.9f * zoomProgress * fade)))
                 AsyncImage(
                     model = File(book.coverPath!!), contentDescription = null, contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .offset { IntOffset(r.left.roundToInt(), r.top.roundToInt()) }
-                        .size(with(density) { r.width.toDp() }, with(density) { r.height.toDp() }),
+                        .size(with(density) { r.width.toDp() }, with(density) { r.height.toDp() })
+                        .graphicsLayer {
+                            scaleX = scale; scaleY = scale
+                            translationX = pan.x; translationY = pan.y + dismiss
+                            alpha = fade
+                        },
                 )
             }
         }
