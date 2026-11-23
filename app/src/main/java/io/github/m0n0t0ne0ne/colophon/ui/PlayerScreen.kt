@@ -2,6 +2,7 @@ package io.github.m0n0t0ne0ne.colophon.ui
 
 import android.os.Build
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Canvas
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -163,7 +164,7 @@ fun PlayerContent(
                         Modifier
                             .onGloballyPositioned { coverBounds = it.boundsInRoot() }
                             .clickable(remember { MutableInteractionSource() }, indication = null) { zoomed = true }
-                            .graphicsLayer { alpha = if (zoomProgress > 0.02f) 0f else 1f }
+                            .graphicsLayer { alpha = if (zoomProgress > 0.001f) 0f else 1f }
                     } else Modifier
                     Cover(book, minOf(maxWidth, maxHeight), modifier = tap, cueColor = dogearChoice ?: accent, cueOpacity = dogearOpacity)
                 }
@@ -283,6 +284,16 @@ fun PlayerContent(
                             alpha = fade
                         },
                 )
+                // The finished bookmark rides the zooming art and fades out as it enlarges, fading back
+                // in on the way home — so it never snaps on or off.
+                if (book.finished && zoomProgress < 0.999f && scale <= 1.01f) {
+                    Canvas(
+                        Modifier
+                            .offset { IntOffset(r.left.roundToInt(), r.top.roundToInt()) }
+                            .size(with(density) { r.width.toDp() }, with(density) { r.height.toDp() })
+                            .graphicsLayer { translationY = dismiss; alpha = fade },
+                    ) { drawFinishedMark(dogearChoice ?: accent, dogearOpacity * (1f - zoomProgress)) }
+                }
             }
         }
 

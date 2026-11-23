@@ -156,7 +156,7 @@ private fun cueOpacityPref(ctx: android.content.Context, bookId: Long): Float =
     ctx.getSharedPreferences("settings", android.content.Context.MODE_PRIVATE).getInt("dogearOpacity_$bookId", 60) / 100f
 
 /** Draws the Colophon bookmark hanging from the top edge, tucked into the top-right corner. */
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawFinishedMark(color: Color, alpha: Float) {
+internal fun androidx.compose.ui.graphics.drawscope.DrawScope.drawFinishedMark(color: Color, alpha: Float) {
     val m = size.minDimension
     val w = m * 0.17f
     val h = m * 0.30f
