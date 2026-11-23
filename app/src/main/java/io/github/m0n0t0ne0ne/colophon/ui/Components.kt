@@ -171,7 +171,7 @@ internal fun androidx.compose.ui.graphics.drawscope.DrawScope.drawFinishedMark(c
         moveTo(px, py - th); lineTo(px + tw, py); lineTo(px, py + th); close()
         fillType = PathFillType.EvenOdd
     }
-    drawPath(mark, color, alpha = alpha.coerceIn(0.1f, 1f))
+    drawPath(mark, color, alpha = alpha.coerceIn(0f, 1f))
 }
 
 /** Per-cover accent for the finished cue, derived like the player's and cached by file path. */

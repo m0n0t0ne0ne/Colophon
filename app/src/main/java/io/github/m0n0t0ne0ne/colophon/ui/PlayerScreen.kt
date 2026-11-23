@@ -272,9 +272,10 @@ fun PlayerContent(
             Box(
                 Modifier.fillMaxSize()
                     .pointerInput(Unit) {
+                        // Single tap only, so closing responds instantly (an onDoubleTap handler would
+                        // make every tap wait out the double-tap timeout before the close fires).
                         detectTapGestures(
                             onTap = { if (scale > 1.01f) { scale = 1f; pan = Offset.Zero } else zoomed = false },
-                            onDoubleTap = { if (scale > 1.01f) { scale = 1f; pan = Offset.Zero } else scale = 2.5f },
                         )
                     }
                     .pointerInput(Unit) {
